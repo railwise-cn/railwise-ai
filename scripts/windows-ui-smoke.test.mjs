@@ -239,6 +239,7 @@ test('website-to-PPT report matches its requested model and verifies a desktop-o
 
   report.webPpt.model = 'controlled-protocol'
   report.webPpt.originalConversation.artifactVisible = true
+  report.webPpt.replyTrace = replyTrace(true)
   report.installedAsarSha256 = '4'.repeat(64)
   report.checks.push('installed-chat-task-pause-restart-recovery')
   report.webPpt.restartRecovery = {

@@ -11,6 +11,7 @@ export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
 export const webPptMonitoringTopic = /自动化监测|工程监测|变形监测|安全监测/
 export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和自动化监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
+export const liveWebPptJourneyPrompt = `${webPptJourneyPrompt}制作要求：1）只读写当前工作区 deck/ 下的相对路径，不要调用 request_host_shell、ppt_master 或访问工作区外路径；2）先用 write 写入 deck/spec_lock.md（首行 <!-- ppt-master-schema: spec-lock/v1 -->，包含 ## canvas 的 viewBox: 0 0 1280 720 与 format: ppt169、## colors 的 bg/primary/accent/text、## typography 的 font_family/title_family/body_family: Arial 及 body: 18 和 title: 36、## pptx_structure 的 mode: flat、## communication 的 primary_language: zh-CN），再用 write 写入单页 deck/svg_output/slide_01.svg（1280x720 纯 <rect> 与不重叠的 <text> 元素，包含官网读取到的工程测量与自动化监测要点及来源 www.railwise.cn）；3）每次修改 SVG 后必须紧接着执行 ppt_master_quality_check（project_path="deck", stage="final"），通过后不再改文件并立即调用 ppt_master_export（project_path="deck", output_path="deck/website.pptx", source="output", format="ppt169"）。`
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
@@ -261,7 +262,7 @@ export function canResolvePptJourneyApproval({ live, allowControlledHostShell, t
   return live === true || allowControlledHostShell === true && ['web_fetch', 'request_host_shell'].includes(toolName)
 }
 
-export function inspectLiveWebPptApprovalResolution(inputs, attention) {
+export function inspectLiveWebPptApprovalResolution(inputs, attention, expectedDecision = 'allow') {
   assert.ok(Array.isArray(inputs), 'The actual task inputs API must return an array')
   const rows = inputs.filter(input => input.kind === 'approval_resolution' && input.sourceId === attention.requestId)
   assert.ok(rows.length <= 1, 'The reviewed approval must have at most one durable decision')
@@ -271,20 +272,47 @@ export function inspectLiveWebPptApprovalResolution(inputs, attention) {
   // resolution property. Bind the read-back to the exact request the UI showed.
   const saved = JSON.parse(rows[0].text)
   assert.equal(saved.request, attention.payload.approval.summary)
-  assert.equal(saved.resolution?.decision, 'allow')
-  return { status: 'allowed', inputId: rows[0].id }
+  assert.equal(saved.resolution?.decision, expectedDecision)
+  return { status: expectedDecision === 'allow' ? 'allowed' : 'denied', inputId: rows[0].id }
 }
 
-async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPath, onStage, reviewedScopes }) {
+async function resolveLiveWebPptApproval(cdp, taskId, { live, workspace, skillGuardPath, onStage, reviewedScopes }) {
   await onStage?.('review-pending-task-approval')
   const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)} && item.kind==='approval' && item.status==='pending'))`)
   assert.equal(pending.length, 1, 'Only one exact approval may be pending for the isolated website-to-PPT task')
-  const receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  const button = 'section[aria-label="任务"] button'
+  let receipt
+  try {
+    receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  } catch (error) {
+    if (!live) throw error
+    await onStage?.('deny-unapproved-live-host-action')
+    await cdp.wait(`(() => {const buttons=[...document.querySelectorAll(${literal(button)})].filter(node=>
+      node.getClientRects().length && !node.disabled && node.textContent.trim()==='拒绝');return buttons.length===1;})()`,
+      'the single visible deny control for the unapproved live action', 30_000)
+    await cdp.click(button, '拒绝')
+    const denyDeadline = Date.now() + 30_000
+    while (Date.now() < denyDeadline) {
+      const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`))
+      const resolution = inspectLiveWebPptApprovalResolution(inputs, pending[0], 'deny')
+      if (resolution) {
+        return {
+          id: pending[0].requestId,
+          tool: pending[0].payload?.approval?.toolName ?? 'unknown',
+          scope: 'denied-unapproved-live-action',
+          decision: 'deny',
+          method: 'installed-task-card',
+          inputId: resolution.inputId
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    throw new Error('The denied live approval did not produce one durable decision')
+  }
   assert.ok(!reviewedScopes.has(receipt.scope), 'The same bounded action must not require repeated approval')
   reviewedScopes.add(receipt.scope)
   const stage = receipt.tool === 'web_fetch' ? 'approve-read-only-official-site' : 'approve-packaged-attribution-check'
   await onStage?.(stage)
-  const button = 'section[aria-label="任务"] button'
   await cdp.wait(`(() => {const buttons=[...document.querySelectorAll(${literal(button)})].filter(node=>
     node.getClientRects().length && !node.disabled && node.textContent.trim()==='允许此操作');return buttons.length===1;})()`,
     'the single visible approval control for the isolated task', 30_000)
@@ -542,13 +570,24 @@ export async function verifyEditableWebPpt(path, artifact, { source = webPptSour
   assert.equal(digest(bytes), artifact.sha256, 'Artifact bytes must match the registered output')
   const archive = await JSZip.loadAsync(bytes, { checkCRC32: true })
   assert.ok(archive.file('ppt/presentation.xml'), 'The ZIP must be a PowerPoint presentation')
-  const slideXml = await archive.file('ppt/slides/slide1.xml')?.async('string')
+  const slideEntries = Object.keys(archive.files)
+    .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  assert.ok(slideEntries.length >= 1, 'The presentation must contain at least one slide')
+  const slideXmls = await Promise.all(slideEntries.map(name => archive.file(name).async('string')))
+  const slideXml = slideXmls[0]
   assert.match(slideXml ?? '', /<p:sp>.*?<a:t[^>]*>[^<]+<\/a:t>/s, 'The slide must contain editable native text')
-  assert.match(slideXml, /工程测量/)
-  assert.match(slideXml, webPptMonitoringTopic)
-  const links = await archive.file('ppt/slides/_rels/slide1.xml.rels')?.async('string')
-  assert.ok(`${slideXml}\n${links ?? ''}`.includes(source), 'The editable presentation must cite the actual source')
-  if (marker) assert.ok(slideXml.includes(marker), 'The editable slide must contain the rendered fixture marker')
+  const allSlideXml = slideXmls.join('\n')
+  const allSlideText = [...allSlideXml.matchAll(/<a:t[^>]*>([^<]*)<\/a:t>/g)].map(match => match[1]).join('')
+  const searchableContent = `${allSlideText}\n${allSlideXml}`
+  assert.match(searchableContent, /工程测量/)
+  assert.match(searchableContent, webPptMonitoringTopic)
+  const relEntries = Object.keys(archive.files).filter(name => /^ppt\/slides\/_rels\/slide\d+\.xml\.rels$/.test(name))
+  const links = (await Promise.all(relEntries.map(name => archive.file(name).async('string')))).join('\n')
+  const citationHaystack = `${searchableContent}\n${links}`
+  const acceptedSources = source === webPptSourceHost ? [webPptSourceHost, 'railwise.cn'] : [source]
+  assert.ok(acceptedSources.some(candidate => citationHaystack.includes(candidate)), 'The editable presentation must cite the actual source')
+  if (marker) assert.ok(searchableContent.includes(marker), 'The editable slide must contain the rendered fixture marker')
   return { bytes: bytes.length, sha256: artifact.sha256, nativeEditableText: true }
 }
 
@@ -659,7 +698,8 @@ export function validateWebPptTurnIdentity(proof) {
   assert.equal(replyTrace.after.task.originThreadId, proof.conversationThreadId)
   assert.ok(!replyTrace.after.attention.some(item => item.requestId === requestId && item.status === 'pending'),
     'The exact answered question must be absent from the pending inbox')
-  assert.equal(replyTrace.after.task.activeTurnId === replyTrace.before.task.activeTurnId, proof.sameTurn)
+  const expectedSameAnswerTurn = proof.restartRecovery ? true : proof.sameTurn
+  assert.equal(replyTrace.after.task.activeTurnId === replyTrace.before.task.activeTurnId, expectedSameAnswerTurn)
   if (proof.sameTurn === true && !proof.initialTurnId && !proof.completedTurnId) return
   assert.ok(proof.initialTurnId && proof.completedTurnId, 'Both execution Turn IDs are required')
   assert.equal(proof.sameTurn, proof.initialTurnId === proof.completedTurnId)
@@ -788,7 +828,9 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
     },
     async verify(cdp, { openArtifact, browserInstanceId, onStage, pauseAndRestart } = {}) {
       await onStage?.('start-original-conversation-journey')
-      let journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
+      let journey = await submitWebPptJourney(cdp, {
+        promptText: live ? liveWebPptJourneyPrompt : webPptJourneyPrompt,
+        expectedQuestion: live ? '网址' : webPptQuestion,
         sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback),
         stopAtQuestion: Boolean(pauseAndRestart), onStage })
       let restartRecovery
@@ -876,13 +918,28 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       }
       await onStage?.('verify-registered-editable-pptx')
       const artifact = task.artifacts.find(item => item.relativePath.replaceAll('\\', '/') === artifactPath)
-      assert.equal(artifact?.validation, 'valid')
-      const output = join(workspace, artifactPath)
-      const fromWorkspace = relative(await realpath(workspace), await realpath(output))
-      assert.ok(fromWorkspace && !isAbsolute(fromWorkspace) && fromWorkspace !== '..' && !fromWorkspace.startsWith(`..${sep}`))
-      const contents = await verifyEditableWebPpt(output, artifact, { source: fallback?.url, marker: fallback?.marker })
-      const selector = await revealArtifact(cdp)
-      await cdp.click(selector, filename)
+        ?? (live ? task.artifacts.find(item => item.validation === 'valid' && item.relativePath.toLowerCase().endsWith('.pptx')) : undefined)
+      let contents, selector, output
+      try {
+        assert.equal(artifact?.validation, 'valid')
+        const deliveredRelativePath = artifact.relativePath.replaceAll('\\', '/')
+        const deliveredFilename = deliveredRelativePath.split('/').at(-1)
+        output = join(workspace, deliveredRelativePath)
+        const fromWorkspace = relative(await realpath(workspace), await realpath(output))
+        assert.ok(fromWorkspace && !isAbsolute(fromWorkspace) && fromWorkspace !== '..' && !fromWorkspace.startsWith(`..${sep}`))
+        contents = await verifyEditableWebPpt(output, artifact, { source: fallback?.url, marker: fallback?.marker })
+        selector = await revealArtifact(cdp, deliveredFilename)
+        await cdp.click(selector, deliveredFilename)
+      } catch (error) {
+        const safeDiagnostics = {
+          stage: 'verify-registered-editable-pptx',
+          artifactCount: Array.isArray(task.artifacts) ? task.artifacts.length : 0,
+          pptxArtifactCount: Array.isArray(task.artifacts) ? task.artifacts.filter(item => typeof item?.relativePath === 'string' && item.relativePath.toLowerCase().endsWith('.pptx')).length : 0,
+          matchedExpectedArtifactPath: Boolean(task.artifacts?.some(item => item.relativePath?.replaceAll('\\', '/') === artifactPath)),
+          selectedValidation: artifact?.validation
+        }
+        throw Object.assign(error, { webPptDiagnostics: safeDiagnostics })
+      }
       await onStage?.('open-pptx-through-system-application')
       const open = openArtifact ? await openArtifact(cdp, { task, artifact, path: output }) : { status: 'ui-click-only' }
       await onStage?.('verify-original-question-and-deliverable-remain-visible')

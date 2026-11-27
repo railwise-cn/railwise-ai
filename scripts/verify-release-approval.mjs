@@ -67,6 +67,7 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/run-mac-ppt-journey.mjs',
   'scripts/run-mac-ppt-journey.test.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
+  'scripts/run-windows-frozen-gui-upgrade.mjs',
   'scripts/run-windows-install-smoke.ps1',
   'scripts/run-windows-offline-spreadsheet-journey.mjs',
   'scripts/run-windows-offline-spreadsheet-journey.test.mjs',

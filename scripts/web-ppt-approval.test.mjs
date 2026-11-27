@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
-import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, inspectLiveWebPptSourceRead, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, safeWebPptToolDetails, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, inspectLiveWebPptSourceRead, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, safeWebPptToolDetails, validatePostRestartTurnFlow, validateWebPptTurnIdentity, verifyEditableWebPpt } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -164,4 +167,51 @@ test('live source read verification accepts current official RailWise engineerin
       output: { finalUrl: url, text: '无关空白页面', resultHash: sha, byteCount: 18 }
     }]
   }, url))
+})
+
+test('validateWebPptTurnIdentity accepts post-restart resumed Turn answer continuity while initialTurnId differs', () => {
+  const requestId = 'in_resumed'
+  validateWebPptTurnIdentity({
+    sameConversation: true,
+    taskId: 'task-1',
+    conversationThreadId: 'thr-conv',
+    originThreadId: 'thr-conv',
+    executionThreadId: 'thr-exec',
+    originalConversation: { questionVisible: true, artifactVisible: true },
+    sameTurn: false,
+    initialTurnId: 'turn-before-pause',
+    completedTurnId: 'turn-after-resume',
+    restartRecovery: { status: 'passed' },
+    replyTrace: {
+      before: {
+        ui: { taskQuestionRequestId: requestId },
+        task: { id: 'task-1', originThreadId: 'thr-conv', activeTurnId: 'turn-after-resume' },
+        attention: [{ kind: 'question', status: 'pending', requestId, questionCount: 1, textQuestion: true, questionId: requestId, questionLabel: '请提供官网网址。' }]
+      },
+      answerReceipt: { idempotencyKey: `user-input:${requestId}`, count: 1, questionId: requestId, answerLength: 15, answerMatchesExpected: true },
+      after: {
+        task: { id: 'task-1', originThreadId: 'thr-conv', activeTurnId: 'turn-after-resume' },
+        inputs: [{ kind: 'supplement', idempotencyKey: `user-input:${requestId}` }],
+        attention: []
+      }
+    }
+  })
+})
+
+test('verifyEditableWebPpt accepts split OOXML text runs and bare railwise.cn source citation', async () => {
+  const { default: JSZip } = await import('jszip')
+  const zip = new JSZip()
+  zip.file('ppt/presentation.xml', '<p:presentation/>')
+  zip.file('ppt/slides/slide1.xml', '<p:sld><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>工程</a:t></a:r><a:r><a:t>测量</a:t></a:r><a:r><a:t>与自动化</a:t></a:r><a:r><a:t>监测</a:t></a:r><a:r><a:t> 来源：railwise.cn</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>')
+  const bytes = await zip.generateAsync({ type: 'nodebuffer' })
+  const dir = await mkdtemp(join(tmpdir(), 'railwise-pptx-verify-'))
+  try {
+    const file = join(dir, 'website.pptx')
+    await writeFile(file, bytes)
+    const sha256 = hash(bytes)
+    const result = await verifyEditableWebPpt(file, { sha256 })
+    assert.deepEqual(result, { bytes: bytes.length, sha256, nativeEditableText: true })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })

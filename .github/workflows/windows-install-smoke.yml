@@ -482,6 +482,7 @@ jobs:
         if: ${{ matrix.arch == 'arm64' && (inputs.web_ppt_journey == 'controlled' || inputs.web_ppt_journey == 'live') }}
         run: |
           brew install --cask libreoffice
+          xattr -dr com.apple.quarantine /Applications/LibreOffice.app || true
           brew install duti
           /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/LibreOffice.app
           duti -s org.libreoffice.script pptx all
