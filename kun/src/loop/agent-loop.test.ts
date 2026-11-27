@@ -3,6 +3,7 @@ import {
   AgentLoop,
   allowedToolNamesWithGuiStateTools,
   resolvePlanModeToolSpecs,
+  taskHasApprovedWebReadOrigin,
   turnRequestForRouting,
   webSearchCapabilityInstruction,
   webSourceToolInstruction
@@ -337,6 +338,33 @@ describe('webSearchCapabilityInstruction', () => {
     const instruction = webSearchCapabilityInstruction('查找最新官网信息', ['ego_browser_open', 'ego_browser_read'].map(spec))
     expect(instruction).toContain('UNTRUSTED')
     expect(instruction).not.toContain('Live web search is unavailable')
+  })
+})
+
+describe('task-scoped web approval lookup', () => {
+  const threadId = 'thread-web-approval'
+  const origin = 'https://www.railwise.cn'
+  const approval = { origin, approvalId: 'approval-1', turnId: 'turn-1', approvedAt: '2026-11-27T00:00:00.000Z' }
+
+  it('reads approval from the exact grant task after the thread active task changes', () => {
+    const grantTask = { id: 'task-grant', threadId, authority: { approvedWebReadOrigins: [approval] } }
+    const activeTask = { id: 'task-retry', threadId, authority: { approvedWebReadOrigins: [] } }
+    const tasks = {
+      activeTask: () => activeTask,
+      getTask: (taskId: string) => taskId === grantTask.id ? grantTask : null
+    } as unknown as Pick<TaskController, 'activeTask' | 'getTask'>
+
+    expect(taskHasApprovedWebReadOrigin(tasks, { taskId: grantTask.id }, threadId, origin)).toBe(true)
+  })
+
+  it('does not fall back to an unrelated active task when the exact task is gone', () => {
+    const activeTask = { id: 'task-retry', threadId, authority: { approvedWebReadOrigins: [approval] } }
+    const tasks = {
+      activeTask: () => activeTask,
+      getTask: () => null
+    } as unknown as Pick<TaskController, 'activeTask' | 'getTask'>
+
+    expect(taskHasApprovedWebReadOrigin(tasks, { taskId: 'task-missing' }, threadId, origin)).toBe(false)
   })
 })
 

@@ -303,3 +303,17 @@ Univer 上游在 `2026-11-25 11:49 UTC` 发布 `v1.6.2`（Apache-2.0），包含
 修复在当前工作区：能力预检分类时忽略明确条件式的浏览器回退，但保留明确浏览器调用请求；网页读取指令先尝试用户提供的精确 URL，之后只尝试本轮由运行时准入的只读 Ego/BrowserSkill 工具，真实返回未就绪时继续其他路径；没有 `web_search` 时不指示模型调用它。对应 KUN 全量测试曾运行至 `5,518` 项通过、`24` 项跳过，唯一失败是过时的文案断言；更新断言后受影响的三组测试 `65/65`、KUN 类型检查、应用类型检查、改动文件 ESLint、KUN 编译及本机生产构建通过。全量 KUN 套件未在断言修正后重跑。
 
 Release run `45651308510` 的精确 Windows 安装检查及 macOS 原地升级 smoke 均通过，但构建源码为 `19dff5a4808eb6f14691e6ce677d5a37f19927f9`，不包含本节修复；Windows 真实模型回执也绑定该旧包。不得将这些结果计为修复后的最终候选通过。本机 Ego Lite 在独立 Space `14` 打开已登录的大单网订阅页并读取到内容；这只验证本机 Ego 登录态，不等于 RailWise 精确候选的 Ego 调用、回到同一 Space 续接或字段核验。正式渠道仍为 `0.5.10`，尚未发布 `0.5.11`。
+
+## 2026-11-27 PPT 工具和验收诊断根因
+
+最新 Windows 安装包实装 `45905625126` 使用源码 `883aeeeaa495d7e450b44b3388ff9e669d052e4c`，Windows 包 SHA-256 `ceacc02aa2b1c8b9354d2b77c9a5472dbe9483597cfd7f0e18730a225e63205e`，安装后 ASAR SHA-256 `fc6735418b84434f27a65ef1aac3af41fcc1ebf603378836cbf8f0b42cbace1e`。官网读取和受限只读审批均成功。随后 PPT Master 的最终导出工具连续失败，5 次 Skill 资源读取返回 `skill_resource_unavailable`，重试达到抑制阈值后模型尝试用 PowerShell 检查随包脚本。该命令超出本次只读网页与归属核验批准范围，正确地等待单独审批；因此真实模型实装中止。回执之前未记录失败资源相对路径、PPT 导出错误码和安全导出参数。
+
+根因有两项。其一，RailWise 只有 PPTX 导出运行时，没有映射 PPT Master 生成流程要求的最终 SVG 质检步骤；上游导出器会拒绝缺少当前最终质量报告或存在阻塞问题的项目，模型按上游 Skill 文档退回主机命令。其二，导出工具通过纯文本错误前缀表达失败，通用工具边界只记录 `error.code`，导致诊断无法从稳定码定位失败类别。已恢复的核心 Skill 文件在当前包中存在，清单与 `SKILL.md` 均为 v6.8.0；本次回执没有保存失败的具体路径，因此旧 9 个示例/README 链接不能作为这 5 次失败的根因结论。
+
+修复在独立分支 `codex/0.5.11-ppt-native-quality-gate`。KUN 新增 `ppt_master_quality_check`，调用已打包的同一 SVG 质检器，支持首页与最终阶段，质量报告写入当前项目并受工作区写授权约束；最终 PPTX 工具说明要求先通过最终质检。RailWise 的 PPT Master 技能说明和运行时指引说明仅让应用工具代替质检与导出 shell 步骤，其他工作流仍遵循宿主工具和授权。导出错误现在有稳定错误码。验收失败摘要只保留相对 Skill 路径、Skill ID、项目相对路径、导出扩展名、格式、阶段及错误码，不保存提示词、原始命令或错误正文。 sidecar 现在正确回传质检退出码和压缩后的报告摘要，往返验证会断言报告版本、阶段和阻塞数，再执行 PPTX 导出与导入。
+
+本地验证：PPT 工具和 Skill 资源读取专项 12/12，PPT 安装验收驱动 13/13，KUN 与主仓类型检查、KUN 编译、改动文件 ESLint、Skill 归属检查、PPT Master attribution guard、差异空白检查通过。Apple Silicon sidecar 按当前源码构建后，`verify:ppt-master-sidecar` 通过，实际完成最终 SVG 质检、生成单页 PPTX 并重新导入 SVG。修正后主应用生产构建通过。
+
+本地源码和 sidecar 结果不代表候选安装包验收。真实模型网站到 PPT 的 Mac/Windows 精确包旅程仍未通过；新候选必须确认资源读取错误消失、最终质检工具实际调用、不会转为未授权主机命令审批、PPTX 可编辑并在原对话打开。首次候选验证和 Windows 路径断言失败详见本节末的 PR #136 与 Release run `45916446346` 记录。修正后的三端候选 run `45919711965` 正在构建，尚无安装包验收结果。正式 Stable 仍是 `0.5.10`，`0.5.11` 未发布。
+
+PR #136 的 Quality checks 已通过，当前提交为 `a98c70a190489f7f8d26d623663ac564b404f7e5`。隔离三端候选 Release run `45916446346` 首次在 Windows sidecar 往返验证阶段失败。Windows sidecar 实际返回 `exitCode=0`、`ppt-master.svg-quality-report.v1`、`stage=final` 和 `blockingCount=0`；失败仅因验收器把 Windows 的 `validation\\svg_quality_report.json` 按 POSIX 分隔符比较。现已将验收路径规范化为 `/`。该 run 未生成应用安装包，不能提供任何候选安装验收结果。修正后的三端候选 run `45919711965` 已启动，Mac 签名构建仍在进行，完成后再做精确包安装与真实模型验收。

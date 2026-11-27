@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, safeWebPptToolDetails, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -97,6 +97,24 @@ test('PPT failure diagnostics retain error codes while excluding error messages 
   assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: true, output: { code: 'web_fetch_failed', error: 'private response text' } }), 'web_fetch_failed')
   assert.equal(safeWebPptErrorCode({ kind: 'tool_result', isError: false, output: { code: 'ok' } }), undefined)
   assert.equal(safeWebPptErrorCode({ kind: 'error', code: 'private response text' }), undefined)
+})
+
+test('PPT failure diagnostics retain only safe relative Skill and export inputs', () => {
+  assert.deepEqual(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'read_skill_resource', arguments: {
+    skill_id: 'ppt-master', path: 'workflows/generate-pptx.md', offset_bytes: 0
+  } }), { skillId: 'ppt-master', resourcePath: 'workflows/generate-pptx.md' })
+  assert.deepEqual(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'ppt_master_export', arguments: {
+    project_path: 'deck', output_path: 'deck/final.pptx', source: 'output', format: 'ppt169'
+  } }), { projectPath: 'deck', outputExtension: 'pptx', source: 'output', format: 'ppt169' })
+  assert.deepEqual(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'ppt_master_quality_check', arguments: {
+    project_path: 'deck', stage: 'final'
+  } }), { projectPath: 'deck', stage: 'final' })
+  assert.equal(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'read_skill_resource', arguments: {
+    skill_id: 'ppt-master', path: 'D:\\private\\secret.md'
+  } }).resourcePath, undefined)
+  assert.equal(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'ppt_master_export', arguments: {
+    project_path: '..\\outside', output_path: 'D:\\private\\secret.pptx'
+  } })?.projectPath, undefined)
 })
 
 test('PPT runtime diagnostics retain safe span fields and omit names, model and attributes', () => {

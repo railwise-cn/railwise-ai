@@ -40,10 +40,18 @@ export type PptMasterExportRunnerInput = {
 
 export type PptMasterExportRunner = (input: PptMasterExportRunnerInput) => Promise<void>
 
+export type PptMasterQualityCheckRunner = (input: {
+  workspaceRoot: string
+  projectPath: string
+  stage: 'first-page' | 'final'
+  signal: AbortSignal
+}) => Promise<{ exitCode: number; reportPath?: string; report?: unknown }>
+
 export type PptMasterToolProviderOptions = {
   skillRoot?: string
   pythonCommand?: string
   runner?: PptMasterExportRunner
+  qualityCheckRunner?: PptMasterQualityCheckRunner
   beforeMutation?: (input: {
     absolutePath: string
     relativePath: string
@@ -74,12 +82,18 @@ export function buildPptMasterToolProviders(
     enabled: true,
     available,
     ...(reason ? { reason } : {}),
-    tools: [createPptMasterExportTool({
-      scriptPath,
-      pythonCommand: options.pythonCommand ?? defaultPythonCommand(),
-      runner: options.runner ?? runPptMasterExport,
-      beforeMutation: options.beforeMutation
-    })]
+    tools: [
+      createPptMasterExportTool({
+        scriptPath,
+        pythonCommand: options.pythonCommand ?? defaultPythonCommand(),
+        runner: options.runner ?? runPptMasterExport,
+        beforeMutation: options.beforeMutation
+      }),
+      createPptMasterQualityCheckTool({
+        runner: options.qualityCheckRunner ?? runPptMasterQualityCheck,
+        beforeMutation: options.beforeMutation
+      })
+    ]
   }
   return {
     providers: [provider],
@@ -96,7 +110,7 @@ function createPptMasterExportTool(input: {
 }) {
   return LocalToolHost.defineTool({
     name: 'ppt_master_export',
-    description: 'Export a PPT Master project containing svg_output/ or svg_final/ into a real PowerPoint .pptx file. HTML is not a valid substitute.',
+    description: 'Export a PPT Master project containing svg_output/ or svg_final/ into a real PowerPoint .pptx file. Run ppt_master_quality_check with stage="final" first and fix blocking issues. HTML is not a valid substitute.',
     toolKind: 'file_change',
     inputSchema: {
       type: 'object',
@@ -126,78 +140,181 @@ function createPptMasterExportTool(input: {
     policy: 'auto',
     shouldAdvertise: (context) => context.activeSkillIds?.includes('ppt-master') === true,
     execute: async (args, context) => withToolBoundary(async () => {
-      if (!input.scriptPath) throw new Error('ppt_master_unavailable: bundled exporter path is missing')
-      const canonicalScriptPath = await realpath(input.scriptPath)
-      const scriptInfo = await lstat(canonicalScriptPath)
-      if (!scriptInfo.isFile()) throw new Error('ppt_master_unavailable: bundled exporter is not a regular file')
+      try {
+        if (!input.scriptPath) throw new Error('ppt_master_unavailable: bundled exporter path is missing')
+        const canonicalScriptPath = await realpath(input.scriptPath)
+        const scriptInfo = await lstat(canonicalScriptPath)
+        if (!scriptInfo.isFile()) throw new Error('ppt_master_unavailable: bundled exporter is not a regular file')
 
-      const rawProjectPath = requiredString(args.project_path, 'project_path')
-      const project = await resolveWorkspacePath(rawProjectPath, context)
-      const projectInfo = await stat(project.absolutePath)
-      if (!projectInfo.isDirectory()) throw new Error('invalid_project: project_path must be a directory')
+        const rawProjectPath = requiredString(args.project_path, 'project_path')
+        const project = await resolveWorkspacePath(rawProjectPath, context)
+        const projectInfo = await stat(project.absolutePath)
+        if (!projectInfo.isDirectory()) throw new Error('invalid_project: project_path must be a directory')
 
-      const source = enumValue(args.source, SOURCE_DIRECTORIES, 'output')
-      const format = enumValue(args.format, CANVAS_FORMATS, 'ppt169')
-      const sourceFolder = source === 'final' ? 'svg_final' : 'svg_output'
-      const svgDirectory = await resolveWorkspacePath(join(project.absolutePath, sourceFolder), context)
-      await validateSvgDirectory(svgDirectory.absolutePath, context)
+        const source = enumValue(args.source, SOURCE_DIRECTORIES, 'output')
+        const format = enumValue(args.format, CANVAS_FORMATS, 'ppt169')
+        const sourceFolder = source === 'final' ? 'svg_final' : 'svg_output'
+        const svgDirectory = await resolveWorkspacePath(join(project.absolutePath, sourceFolder), context)
+        await validateSvgDirectory(svgDirectory.absolutePath, context)
 
-      const defaultOutputName = `${safeOutputStem(basename(project.absolutePath))}.pptx`
-      const rawOutputPath = optionalString(args.output_path) || join(project.relativePath, defaultOutputName)
-      if (extname(rawOutputPath).toLowerCase() !== '.pptx') {
-        throw new Error('invalid_output: output_path must end in .pptx')
+        const defaultOutputName = `${safeOutputStem(basename(project.absolutePath))}.pptx`
+        const rawOutputPath = optionalString(args.output_path) || join(project.relativePath, defaultOutputName)
+        if (extname(rawOutputPath).toLowerCase() !== '.pptx') {
+          throw new Error('invalid_output: output_path must end in .pptx')
+        }
+        const output = await resolveWorkspacePath(rawOutputPath, context, 'write')
+        assertCanWritePath(output.absolutePath, context)
+        await input.beforeMutation?.({
+          absolutePath: output.absolutePath,
+          relativePath: output.relativePath,
+          workspaceRoot: context.workspace,
+          threadId: context.threadId,
+          turnId: context.turnId
+        })
+        await mkdir(dirname(output.absolutePath), { recursive: true })
+        await resolveWorkspacePath(output.absolutePath, context, 'write')
+
+        await input.runner({
+          workspaceRoot: context.workspace,
+          pythonCommand: input.pythonCommand,
+          scriptPath: canonicalScriptPath,
+          projectPath: project.absolutePath,
+          outputPath: output.absolutePath,
+          source,
+          format,
+          signal: context.abortSignal
+        })
+        const outputInfo = await stat(output.absolutePath)
+        if (!outputInfo.isFile() || outputInfo.size === 0) {
+          throw new Error('ppt_master_export_failed: exporter did not create a valid .pptx file')
+        }
+        if (outputInfo.size > MAX_PPTX_BYTES) {
+          throw new Error(`resource_limit: exported PPTX exceeds ${MAX_PPTX_BYTES} bytes`)
+        }
+        const verifiedOutput = await resolveWorkspacePath(output.absolutePath, context, 'write')
+        const sha256 = await hashFile(verifiedOutput.absolutePath)
+        return {
+          output: {
+            ok: true,
+            format: 'pptx',
+            path: verifiedOutput.relativePath,
+            sha256,
+            generatedFiles: [{
+              name: basename(verifiedOutput.absolutePath),
+              path: verifiedOutput.relativePath,
+              relativePath: verifiedOutput.relativePath,
+              absolutePath: verifiedOutput.absolutePath,
+              sha256,
+              mimeType: PPTX_MIME_TYPE,
+              byteSize: outputInfo.size
+            }]
+          }
+        }
+      } catch (error) {
+        throw codedPptError(error, 'ppt_master_export_failed')
       }
-      const output = await resolveWorkspacePath(rawOutputPath, context, 'write')
-      assertCanWritePath(output.absolutePath, context)
+    })
+  })
+}
+
+function createPptMasterQualityCheckTool(input: {
+  runner: PptMasterQualityCheckRunner
+  beforeMutation?: PptMasterToolProviderOptions['beforeMutation']
+}) {
+  return LocalToolHost.defineTool({
+    name: 'ppt_master_quality_check',
+    description: 'Run the bundled PPT Master SVG quality checker for this project. Use first-page during authoring and final before export. The result is bound to the current SVG files.',
+    toolKind: 'file_change',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_path: { type: 'string', description: 'Workspace-relative PPT Master project directory.' },
+        stage: { type: 'string', enum: ['first-page', 'final'], description: 'Quality check stage.' }
+      },
+      required: ['project_path'],
+      additionalProperties: false
+    },
+    policy: 'auto',
+    shouldAdvertise: context => context.activeSkillIds?.includes('ppt-master') === true,
+    execute: async (args, context) => withToolBoundary(async () => {
+      const project = await resolveWorkspacePath(requiredString(args.project_path, 'project_path'), context, 'write')
+      const projectInfo = await stat(project.absolutePath)
+      if (!projectInfo.isDirectory()) throw codedPptError(new Error('project_path must be a directory'), 'invalid_project')
+      const stage = enumValue(args.stage, ['first-page', 'final'] as const, 'final')
+      const reportPath = join(project.absolutePath, 'validation', stage === 'final'
+        ? 'svg_quality_report.json'
+        : 'svg_quality_first_page_report.json')
+      const report = await resolveWorkspacePath(reportPath, context, 'write')
+      assertCanWritePath(report.absolutePath, context)
       await input.beforeMutation?.({
-        absolutePath: output.absolutePath,
-        relativePath: output.relativePath,
+        absolutePath: report.absolutePath,
+        relativePath: report.relativePath,
         workspaceRoot: context.workspace,
         threadId: context.threadId,
         turnId: context.turnId
       })
-      await mkdir(dirname(output.absolutePath), { recursive: true })
-      await resolveWorkspacePath(output.absolutePath, context, 'write')
-
-      await input.runner({
+      const result = await input.runner({
         workspaceRoot: context.workspace,
-        pythonCommand: input.pythonCommand,
-        scriptPath: canonicalScriptPath,
         projectPath: project.absolutePath,
-        outputPath: output.absolutePath,
-        source,
-        format,
+        stage,
         signal: context.abortSignal
       })
-
-      const outputInfo = await stat(output.absolutePath)
-      if (!outputInfo.isFile() || outputInfo.size === 0) {
-        throw new Error('ppt_master_export_failed: exporter did not create a valid .pptx file')
-      }
-      if (outputInfo.size > MAX_PPTX_BYTES) {
-        throw new Error(`resource_limit: exported PPTX exceeds ${MAX_PPTX_BYTES} bytes`)
-      }
-      const verifiedOutput = await resolveWorkspacePath(output.absolutePath, context, 'write')
-      const sha256 = await hashFile(verifiedOutput.absolutePath)
+      const summary = summarizeQualityCheck(result.report, stage, result.exitCode)
       return {
         output: {
-          ok: true,
-          format: 'pptx',
-          path: verifiedOutput.relativePath,
-          sha256,
-          generatedFiles: [{
-            name: basename(verifiedOutput.absolutePath),
-            path: verifiedOutput.relativePath,
-            relativePath: verifiedOutput.relativePath,
-            absolutePath: verifiedOutput.absolutePath,
-            sha256,
-            mimeType: PPTX_MIME_TYPE,
-            byteSize: outputInfo.size
-          }]
+          ok: summary.ok,
+          stage,
+          reportPath: report.relativePath,
+          exitCode: result.exitCode,
+          summary: summary.summary,
+          blockingCount: summary.blockingCount,
+          warningCount: summary.warningCount,
+          issues: summary.issues
         }
       }
     })
   })
+}
+
+function summarizeQualityCheck(report: unknown, stage: 'first-page' | 'final', exitCode: number) {
+  const value = report && typeof report === 'object' ? report as Record<string, unknown> : {}
+  const categories = value.categories && typeof value.categories === 'object'
+    ? value.categories as Record<string, unknown>
+    : {}
+  const blocking = categories.blocking && typeof categories.blocking === 'object'
+    ? categories.blocking as Record<string, unknown>
+    : {}
+  const introduced = categories.introduced && typeof categories.introduced === 'object'
+    ? categories.introduced as Record<string, unknown>
+    : {}
+  const blockingIssues = Array.isArray(blocking.issues) ? blocking.issues : []
+  const issues = blockingIssues.slice(0, 12).flatMap(issue => {
+    if (!issue || typeof issue !== 'object') return []
+    const item = issue as Record<string, unknown>
+    const file = typeof item.file === 'string' ? basename(item.file) : undefined
+    const message = typeof item.message === 'string' ? item.message.slice(0, 240) : undefined
+    return [{ ...(file ? { file } : {}), ...(message ? { message } : {}) }]
+  })
+  const blockingCount = Number.isInteger(blocking.count) ? blocking.count as number : blockingIssues.length
+  const warningCount = Number.isInteger(introduced.count) ? introduced.count as number : 0
+  const reportStage = value.stage
+  const validReport = value.schema === 'ppt-master.svg-quality-report.v1' && reportStage === stage
+  const summary = value.summary && typeof value.summary === 'object' ? value.summary : undefined
+  return {
+    ok: exitCode === 0 && validReport && blockingCount === 0,
+    ...(summary ? { summary } : {}),
+    blockingCount,
+    warningCount,
+    issues
+  }
+}
+
+function codedPptError(error: unknown, fallbackCode: string): Error & { code: string } {
+  const source = error instanceof Error ? error : new Error(String(error))
+  const existingCode = typeof (error as { code?: unknown })?.code === 'string'
+    ? (error as { code: string }).code
+    : /^([a-z][a-z0-9_:-]{0,79}):/i.exec(source.message)?.[1]
+  return Object.assign(new Error(source.message, { cause: error }), { code: existingCode ?? fallbackCode })
 }
 
 async function hashFile(path: string): Promise<string> {
@@ -280,6 +397,25 @@ async function runPptMasterExport(input: PptMasterExportRunnerInput): Promise<vo
         `Python exporter also failed: ${errorMessage(pythonError)}`
       ].join(' '))
     }
+  }
+}
+
+async function runPptMasterQualityCheck(input: {
+  workspaceRoot: string
+  projectPath: string
+  stage: 'first-page' | 'final'
+  signal: AbortSignal
+}): Promise<{ exitCode: number; reportPath?: string; report?: unknown }> {
+  const response = await runRuntimePptMasterSidecar({
+    operation: 'ppt-master-quality-check',
+    workspaceRoot: input.workspaceRoot,
+    projectPath: input.projectPath,
+    stage: input.stage
+  }, { timeoutMs: EXPORT_TIMEOUT_MS, signal: input.signal })
+  return {
+    exitCode: Number.isInteger(response.exitCode) ? response.exitCode! : 1,
+    ...(response.reportPath ? { reportPath: response.reportPath } : {}),
+    ...(response.report !== undefined ? { report: response.report } : {})
   }
 }
 

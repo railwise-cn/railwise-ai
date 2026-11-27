@@ -7,7 +7,8 @@ import { LocalToolHost } from '../src/adapters/tool/local-tool-host.js'
 import { ExecutionGrantSchema } from '../src/contracts/permissions.js'
 import {
   buildPptMasterToolProviders,
-  type PptMasterExportRunner
+  type PptMasterExportRunner,
+  type PptMasterQualityCheckRunner
 } from '../src/adapters/tool/ppt-master-tool-provider.js'
 
 describe('PPT Master export tool provider', () => {
@@ -53,7 +54,9 @@ describe('PPT Master export tool provider', () => {
 
     expect(await host.listTools(baseContext)).toEqual([])
     const context = { ...baseContext, activeSkillIds: ['ppt-master'] }
-    expect((await host.listTools(context)).map((tool) => tool.name)).toEqual(['ppt_master_export'])
+    expect((await host.listTools(context)).map((tool) => tool.name)).toEqual([
+      'ppt_master_export', 'ppt_master_quality_check'
+    ])
 
     const result = await host.execute({
       callId: 'call_1',
@@ -153,6 +156,63 @@ describe('PPT Master export tool provider', () => {
     expect(accepted.item).toMatchObject({ kind: 'tool_result', isError: false, output: { ok: true,
       generatedFiles: [{ relativePath: 'deck/result.pptx', sha256: expect.stringMatching(/^[a-f0-9]{64}$/) }] } })
     expect(runner).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs the bundled quality gate with workspace-bound reports and a bounded summary', async () => {
+    const qualityCheckRunner = vi.fn<PptMasterQualityCheckRunner>(async ({ projectPath, stage }) => {
+      await mkdir(join(projectPath, 'validation'), { recursive: true })
+      return {
+        exitCode: 0,
+        reportPath: 'deck/validation/svg_quality_report.json',
+        report: {
+          schema: 'ppt-master.svg-quality-report.v1', stage,
+          summary: { checked: 1, errors: 0, warnings: 1 },
+          categories: {
+            blocking: { count: 0, issues: [] },
+            introduced: { count: 1, issues: [] }
+          }
+        }
+      }
+    })
+    const built = buildPptMasterToolProviders({ skillRoot, qualityCheckRunner })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(built.providers) })
+    const context = {
+      threadId: 'thread_1', turnId: 'turn_1', workspace, activeSkillIds: ['ppt-master'],
+      approvalPolicy: 'auto' as const, sandboxMode: 'workspace-write' as const,
+      abortSignal: new AbortController().signal, awaitApproval: async () => 'allow' as const
+    }
+
+    expect((await host.listTools(context)).map(tool => tool.name)).toContain('ppt_master_quality_check')
+    expect(await host.listTools({ ...context, activeSkillIds: [] })).toEqual([])
+    const result = await host.execute({
+      callId: 'quality-check', toolName: 'ppt_master_quality_check',
+      arguments: { project_path: 'deck', stage: 'final' }
+    }, context)
+
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: false, output: {
+      ok: true, stage: 'final', reportPath: 'deck/validation/svg_quality_report.json',
+      exitCode: 0, blockingCount: 0, warningCount: 1,
+      summary: { checked: 1, errors: 0, warnings: 1 }
+    } })
+    expect(qualityCheckRunner).toHaveBeenCalledWith(expect.objectContaining({
+      workspaceRoot: workspace, projectPath: join(workspace, 'deck'), stage: 'final'
+    }))
+  })
+
+  it('assigns a stable export error code without replacing an existing policy code', async () => {
+    const failed = buildPptMasterToolProviders({ skillRoot, runner: async () => { throw new Error('specific exporter failure') } })
+    const host = new LocalToolHost({ registry: new CapabilityRegistry(failed.providers) })
+    const context = {
+      threadId: 'thread_1', turnId: 'turn_1', workspace, activeSkillIds: ['ppt-master'],
+      approvalPolicy: 'auto' as const, sandboxMode: 'workspace-write' as const,
+      abortSignal: new AbortController().signal, awaitApproval: async () => 'allow' as const
+    }
+    const result = await host.execute({
+      callId: 'export-failed', toolName: 'ppt_master_export',
+      arguments: { project_path: 'deck', output_path: 'deck/result.pptx' }
+    }, context)
+    expect(result.item).toMatchObject({ kind: 'tool_result', isError: true,
+      output: { code: 'ppt_master_export_failed', error: 'specific exporter failure' } })
   })
 
   it('uses the portable exporter when Python is unavailable', async () => {

@@ -72,8 +72,8 @@ authoring guidance in
 Run this manual smoke from the repository root after changing
 `shape_boolean_svg.py`, preset geometry, path conversion, or custom-geometry
 import/export. It uses only a gitignored `projects/_smoke_*` workspace and the
-inline-smoke convention from [`code-style.md`](../../../../docs/rules/code-style.md)
-§11; do not turn it into a test file or example deck.
+repository's inline-smoke convention (§11); do not turn it into a test file or
+example deck.
 
 ```bash
 python3 - <<'PY'

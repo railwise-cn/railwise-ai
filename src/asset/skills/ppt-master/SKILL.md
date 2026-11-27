@@ -52,6 +52,24 @@ use CWD, or assume a repo checkout. If unavailable, ask; never search or guess.
 | Create Template | [`workflows/create-template.md`](workflows/create-template.md) |
 | Edit Native PPTX | [`workflows/edit-native-pptx.md`](workflows/edit-native-pptx.md) |
 
+### RailWise Runtime Tools
+
+In RailWise, read linked Skill files with `read_skill_resource`, using the
+relative path from this package and `skill_id="ppt-master"`. Do not pass an
+absolute path or a repository-relative path. When a resource read fails, use
+the returned relative path and error code to correct that reference; do not
+search the package with a host command.
+
+RailWise provides `ppt_master_quality_check` for the workflow's SVG quality
+gate. Run it with `stage="first-page"` for the first-page gate and
+`stage="final"` after the final SVG roster is complete. Repair only the
+reported project files, rerun the relevant gate, and proceed to the export
+tool after the final gate passes. Use `ppt_master_export` for SVG-to-PPTX
+export. These tools invoke the packaged runtime and preserve the current
+workspace authorization. Use them instead of shell commands for the SVG quality
+gate and PPTX export. Other workflow stages continue to use the tools and
+authorization available in the host application.
+
 **Hard rule — selected authority only**: Do not load another top-level route's
 procedure after routing. Image to PPTX and Beautify are mutually exclusive;
 Image to PPTX activates Quick, while Beautify selects from explicit Quick

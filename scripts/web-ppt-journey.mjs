@@ -110,6 +110,36 @@ export function safeWebPptRuntimeSummary(summary) {
     .map(key => [key, summary[key]]))
 }
 
+export function safeWebPptToolDetails(item) {
+  const args = item?.kind === 'tool_call' && item.arguments && typeof item.arguments === 'object'
+    ? item.arguments
+    : undefined
+  const relativePath = value => typeof value === 'string' && value.length <= 512 &&
+    !value.startsWith('/') && !value.startsWith('\\') && !/^[a-z]:/i.test(value) &&
+    !Array.from(value).some(character => character.charCodeAt(0) <= 0x1f || character.charCodeAt(0) === 0x7f) &&
+    !value.split(/[\\/]/).includes('..')
+    ? value
+    : undefined
+  const details = {}
+  if (item.toolName === 'read_skill_resource') {
+    if (typeof args?.skill_id === 'string' && /^[a-z0-9][a-z0-9_-]{0,127}$/i.test(args.skill_id)) {
+      details.skillId = args.skill_id
+    }
+    const path = relativePath(args?.path)
+    if (path) details.resourcePath = path
+  }
+  if (['ppt_master_quality_check', 'ppt_master_export', 'ppt_master'].includes(item.toolName)) {
+    const projectPath = relativePath(args?.project_path ?? args?.projectDir)
+    const outputPath = relativePath(args?.output_path ?? args?.outputPath)
+    if (projectPath) details.projectPath = projectPath
+    if (outputPath) details.outputExtension = outputPath.split('.').at(-1)?.slice(0, 12).toLowerCase()
+    if (['output', 'final'].includes(args?.source)) details.source = args.source
+    if (['ppt169', 'ppt43'].includes(args?.format)) details.format = args.format
+    if (['first-page', 'final'].includes(args?.stage)) details.stage = args.stage
+  }
+  return Object.keys(details).length ? details : undefined
+}
+
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
   const [task, inputs, inbox, thread, runtimeDiagnostics] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
@@ -136,7 +166,8 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
         approvalPolicy: turn.executionGrant.approvalPolicy, networkAllowlist: turn.executionGrant.networkAllowlist,
         taskPermissionId: turn.executionGrant.taskPermissionId, webTools: turn.executionGrant.allowedToolNames?.filter(name => ['web_fetch', 'web_search'].includes(name)) } } : {}),
       itemKinds: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName, requestId: item.requestId,
-        status: item.status, isError: item.isError, errorCode: safeWebPptErrorCode(item) })) }))
+        status: item.status, isError: item.isError, errorCode: safeWebPptErrorCode(item),
+        ...((item.kind === 'tool_call' ? safeWebPptToolDetails(item) : undefined) ?? {}) })) }))
   }
 }
 
