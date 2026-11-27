@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "version": "0.5.11",
+  "windows": {
+    "viewport": {
+      "width": 1024,
+      "height": 728,
+      "scale": 1
+    },
+    "locale": "zh",
+    "theme": "dark",
+    "receipt": "windows-install-smoke.json"
+  },
+  "mac": [
+    {
+      "arch": "arm64",
+      "receipt": "mac-startup-appearance-arm64.json",
+      "startup": [
+        {
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "locale": "en",
+          "theme": "light",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false
+        },
+        {
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "locale": "zh-CN",
+          "theme": "dark",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false
+        }
+      ]
+    },
+    {
+      "arch": "x64",
+      "receipt": "mac-startup-appearance-x64.json",
+      "startup": [
+        {
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "locale": "en",
+          "theme": "light",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false
+        },
+        {
+          "subtitle": "基于本地优先架构的智能协同工作台",
+          "locale": "zh-CN",
+          "theme": "dark",
+          "viewport": {
+            "width": 360,
+            "height": 248,
+            "scale": 1
+          },
+          "versionVisible": false
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    "mac-startup-zh-dark-arm64.png",
+    "mac-startup-zh-dark-x64.png",
+    "windows-startup-appearance-zh-dark.png"
+  ]
+}

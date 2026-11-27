@@ -1,0 +1,162 @@
+{
+  "status": "passed",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "version": "0.5.11",
+  "requiredCI": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/quality.yml",
+    "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "runId": 45982520268,
+    "runAttempt": 1
+  },
+  "jobs": [
+    {
+      "name": "OpenSpec, brand, lint, type, test, build",
+      "id": 140449777671,
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run openspec:validate",
+        "Run npm run verify:brand-boundary",
+        "Run npm run verify:document-licenses",
+        "Run npm run lint",
+        "Run npm run typecheck",
+        "Prepare checksummed Electron runtime",
+        "Run npm test",
+        "Verify Stable release workflow gates",
+        "Website audit regression checks (offline fixtures)",
+        "Website canonical route inspection checks (offline fixtures)",
+        "Run npm --prefix kun run typecheck",
+        "Run npm --prefix kun test",
+        "Run npm run build",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "Windows path, spawn, persistence",
+      "id": 140449777828,
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Run npm run typecheck",
+        "Verify native Windows ASAR paths and offline runtime packaging",
+        "Run core Windows security tests",
+        "Verify Windows Runtime shutdown through owned IPC",
+        "Run plugin Windows security tests",
+        "Run npm --prefix kun test -- --run tests/atomic-write.test.ts tests/builtin-tools.test.ts src/services/process-identity-async.test.ts tests/process-identity-async.windows.test.ts src/services/task-run-repository.test.ts src/services/task-controller.test.ts src/services/runtime-span-service.test.ts src/loop/task-run-recovery.test.ts",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    },
+    {
+      "name": "Electron production smoke",
+      "id": 140449777418,
+      "passedSteps": [
+        "Set up job",
+        "Run actions/checkout@v7",
+        "Run actions/setup-node@v7",
+        "Run npm ci",
+        "Prepare checksummed Electron runtime",
+        "Run npm run build",
+        "Launch packaged production preview",
+        "Post Run actions/setup-node@v7",
+        "Post Run actions/checkout@v7",
+        "Complete job"
+      ]
+    }
+  ],
+  "productionPackages": {
+    "schemaVersion": 1,
+    "mode": "exact-build",
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "headRef": "refs/heads/main",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+    "workflowSha": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "runId": 46003137436,
+    "runAttempt": 1,
+    "publicIdentity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI"
+    },
+    "artifacts": [
+      {
+        "name": "release-mac",
+        "id": 15202795594,
+        "digest": "sha256:afa6d4174c6124d518a53a2a6cec772a9c2d997996010f3724e49073bbf66cad"
+      },
+      {
+        "name": "release-win",
+        "id": 15201620732,
+        "digest": "sha256:a7f01bbd75a7f06db36a012e7b1953c0c81ef0f67a852e13e59e862e86b499f7"
+      }
+    ],
+    "files": [
+      {
+        "name": "RailWise-AI-0.5.11-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 396477169,
+        "sha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-arm64.zip",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 403377918,
+        "sha256": "1f7561cdcc8cf75364509997941132c07cef469987b702695e344557819a99c8"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 403477620,
+        "sha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-x64.zip",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 410586836,
+        "sha256": "e009ecc74f1ec66e5879979f0c1646b8821ff5d7fbf5370432c7580b4c4aa6f0"
+      },
+      {
+        "name": "latest-mac.yml",
+        "platform": "darwin",
+        "artifact": "release-mac",
+        "size": 845,
+        "sha256": "26f5104f2f20c1050f811ea4198878fa4ac3aad895d73616050f12c4d91e62ab"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-win-x64.exe",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 320759899,
+        "sha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-win-x64.exe.blockmap",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 328587,
+        "sha256": "0e23f64f58143f3d10553ade0df5ec949fadb860a753de8200a5461ddbcbde7f"
+      },
+      {
+        "name": "latest.yml",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 358,
+        "sha256": "6e61a221dc028393812f8ed0351f51ce623f488e0436f1fa3513ed7691c9bcc2"
+      }
+    ]
+  }
+}

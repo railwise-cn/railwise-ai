@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "version": "0.5.11",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "platform": "win32",
+  "arch": "x64",
+  "installerSha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c",
+  "installedAsarSha256": "a411029ff2fec3580525f26c2368c270d7e6692f7fff62ea4c7cd1c8203b3f62",
+  "buildRunId": 46003137436,
+  "buildRunAttempt": 1,
+  "journeys": [
+    {
+      "id": "windows-updater-settings",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "frozen-windows-update.json records the exact install action and settings, workspace, conversation and release-highlight readback for the verified package.",
+      "proofFile": "frozen-windows-update.json",
+      "proofSha256": "5abe3b3275811355fba2fca7e37c81ed7af93cf2991043702d59b31d5ba71c6a"
+    }
+  ],
+  "execution": "hosted",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/windows-install-smoke.yml",
+    "sourceHead": "866dd884081bbca1f1831d7ad36fae38651cb4cd",
+    "runId": 46041525422,
+    "runAttempt": 1
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "version": "0.5.11",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "platform": "win32",
+  "arch": "x64",
+  "installerSha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c",
+  "installedAsarSha256": "a411029ff2fec3580525f26c2368c270d7e6692f7fff62ea4c7cd1c8203b3f62",
+  "buildRunId": 46003137436,
+  "buildRunAttempt": 1,
+  "journeys": [
+    {
+      "id": "pause-restart-recovery",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "windows-ui-smoke.json records the exact installed application pausing an open question, restarting with the same profile, answering in the original conversation and resolving one visible approval once.",
+      "proofFile": "windows-install-smoke.json",
+      "proofSha256": "0da4bd70e841e4cd7ed3f6f7a258de4b65cb51db871f642bb2fe9386ca4a3bfd"
+    }
+  ],
+  "execution": "hosted",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/windows-install-smoke.yml",
+    "sourceHead": "866dd884081bbca1f1831d7ad36fae38651cb4cd",
+    "runId": 46041543808,
+    "runAttempt": 1
+  }
+}

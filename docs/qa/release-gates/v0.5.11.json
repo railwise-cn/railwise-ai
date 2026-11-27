@@ -1,0 +1,315 @@
+{
+  "schemaVersion": 2,
+  "scope": "public-release",
+  "status": "passed",
+  "release": {
+    "tag": "v0.5.11",
+    "version": "0.5.11",
+    "previousTag": "v0.5.10",
+    "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "sourceTree": "4c3fe81f97964994f8f2511810d34025e84bd039",
+    "visualChange": true,
+    "updaterPathChanged": true
+  },
+  "package": {
+    "version": "0.5.11",
+    "sourceVersion": "0.5.11",
+    "buildVersion": "0.5.11",
+    "identity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "artifactSha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa",
+      "asarSha256": "3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121"
+    },
+    "reviewedBuild": {
+      "schemaVersion": 1,
+      "mode": "exact-build",
+      "repository": "railwise-cn/railwise-ai",
+      "workflowPath": ".github/workflows/release.yml",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "headRef": "refs/heads/main",
+      "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+      "workflowSha": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "runId": 46003137436,
+      "runAttempt": 1,
+      "publicIdentity": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "packageName": "workwise",
+        "productName": "RailWise AI"
+      },
+      "artifacts": [
+        {
+          "name": "release-mac",
+          "id": 15202795594,
+          "digest": "sha256:afa6d4174c6124d518a53a2a6cec772a9c2d997996010f3724e49073bbf66cad"
+        },
+        {
+          "name": "release-win",
+          "id": 15201620732,
+          "digest": "sha256:a7f01bbd75a7f06db36a012e7b1953c0c81ef0f67a852e13e59e862e86b499f7"
+        }
+      ],
+      "files": [
+        {
+          "name": "RailWise-AI-0.5.11-mac-arm64.dmg",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 396477169,
+          "sha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa"
+        },
+        {
+          "name": "RailWise-AI-0.5.11-mac-arm64.zip",
+          "platform": "darwin-arm64",
+          "artifact": "release-mac",
+          "size": 403377918,
+          "sha256": "1f7561cdcc8cf75364509997941132c07cef469987b702695e344557819a99c8"
+        },
+        {
+          "name": "RailWise-AI-0.5.11-mac-x64.dmg",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 403477620,
+          "sha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4"
+        },
+        {
+          "name": "RailWise-AI-0.5.11-mac-x64.zip",
+          "platform": "darwin-x64",
+          "artifact": "release-mac",
+          "size": 410586836,
+          "sha256": "e009ecc74f1ec66e5879979f0c1646b8821ff5d7fbf5370432c7580b4c4aa6f0"
+        },
+        {
+          "name": "latest-mac.yml",
+          "platform": "darwin",
+          "artifact": "release-mac",
+          "size": 845,
+          "sha256": "26f5104f2f20c1050f811ea4198878fa4ac3aad895d73616050f12c4d91e62ab"
+        },
+        {
+          "name": "RailWise-AI-0.5.11-win-x64.exe",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 320759899,
+          "sha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c"
+        },
+        {
+          "name": "RailWise-AI-0.5.11-win-x64.exe.blockmap",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 328587,
+          "sha256": "0e23f64f58143f3d10553ade0df5ec949fadb860a753de8200a5461ddbcbde7f"
+        },
+        {
+          "name": "latest.yml",
+          "platform": "win32-x64",
+          "artifact": "release-win",
+          "size": 358,
+          "sha256": "6e61a221dc028393812f8ed0351f51ce623f488e0436f1fa3513ed7691c9bcc2"
+        }
+      ]
+    },
+    "installedMetadata": {
+      "version": "0.5.11",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "packageName": "workwise",
+      "productName": "RailWise AI",
+      "asarSha256": "3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121"
+    },
+    "signature": {
+      "status": "passed",
+      "scope": "macOS Developer ID and recorded Windows Authenticode status",
+      "windowsInstallerAuthenticode": "NotSigned",
+      "windowsExecutableAuthenticode": "NotSigned"
+    },
+    "notarization": {
+      "status": "passed",
+      "scope": "Both macOS architectures verified with Developer ID, stapler and Gatekeeper"
+    },
+    "screenshots": [
+      "docs/qa/release-gates/v0.5.11/mac-startup-zh-dark-arm64.png",
+      "docs/qa/release-gates/v0.5.11/mac-startup-zh-dark-x64.png",
+      "docs/qa/release-gates/v0.5.11/windows-startup-appearance-zh-dark.png"
+    ]
+  },
+  "checks": {
+    "productionBuild": {
+      "status": "passed",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "path": "docs/qa/release-gates/v0.5.11/build-and-focused.json"
+    },
+    "focusedTests": {
+      "status": "passed",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "path": "docs/qa/release-gates/v0.5.11/build-and-focused.json"
+    },
+    "requiredCI": {
+      "status": "passed",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/quality.yml",
+        "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+        "runId": 45982520268,
+        "runAttempt": 1
+      }
+    }
+  },
+  "acceptance": {
+    "installedPackage": {
+      "status": "passed",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "path": "docs/qa/release-gates/v0.5.11/installed-package.json"
+    },
+    "packagedUI": {
+      "status": "passed",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "path": "docs/qa/release-gates/v0.5.11/packaged-ui.json"
+    },
+    "updaterRoundTrip": {
+      "status": "passed",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "path": "docs/qa/release-gates/v0.5.11/updater-acceptance.json",
+      "mode": "exact-build",
+      "baseVersion": "0.5.10",
+      "machineReportPath": "docs/qa/release-gates/v0.5.11/frozen-updater.json",
+      "nativeReportPath": "docs/qa/release-gates/v0.5.11/native-updater.json",
+      "workflowRun": {
+        "repository": "railwise-cn/railwise-ai",
+        "workflowPath": ".github/workflows/release.yml",
+        "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+        "headRef": "refs/heads/main",
+        "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+        "workflowSha": "a435bb924176f062244724aa0120b49e84ab6d98",
+        "runId": 46003137436,
+        "runAttempt": 1,
+        "artifact": {
+          "name": "exact-package-updater-46003137436",
+          "id": 15204276064,
+          "digest": "sha256:0c4d45c96d09efa90e9b8a9a72831a2bd8d6c38a0111e37a2d2dfd5e7286576a"
+        }
+      }
+    },
+    "coreJourneys": {
+      "status": "passed",
+      "receipts": [
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-win-startup.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+            "runId": 46005705727,
+            "runAttempt": 1,
+            "jobName": "Install and inspect the existing Windows package",
+            "artifact": {
+              "id": 15202091552,
+              "name": "exact-package-windows-install-46005705727",
+              "digest": "sha256:5ff0ed09c249ee8c05d9955e5240aaa4fa31a9ce043ff909c5f8cb2ad77a1aa7",
+              "reportPath": "exact-windows-evidence/core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-win-updater-sidebar.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "866dd884081bbca1f1831d7ad36fae38651cb4cd",
+            "runId": 46041525422,
+            "runAttempt": 1,
+            "jobName": "Official 0.5.10 to exact candidate (sidebar)",
+            "artifact": {
+              "id": 15220716595,
+              "name": "frozen-windows-gui-upgrade-46041525422-sidebar",
+              "digest": "sha256:6ce89cecdc24dd22744f7b384a00afcbedf7a6ab146ca579c0bf141ebab7f1d9",
+              "reportPath": "core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-win-updater-settings.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "866dd884081bbca1f1831d7ad36fae38651cb4cd",
+            "runId": 46041525422,
+            "runAttempt": 1,
+            "jobName": "Official 0.5.10 to exact candidate (settings)",
+            "artifact": {
+              "id": 15219888475,
+              "name": "frozen-windows-gui-upgrade-46041525422-settings",
+              "digest": "sha256:d703aea2d081b1bfab4f48d05ec717fced56b22bf5475201875f21e8f42fc34f",
+              "reportPath": "core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-win-pause-restart.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "866dd884081bbca1f1831d7ad36fae38651cb4cd",
+            "runId": 46041543808,
+            "runAttempt": 1,
+            "jobName": "Install and inspect the existing Windows package",
+            "artifact": {
+              "id": 15220012889,
+              "name": "exact-package-windows-install-46041543808",
+              "digest": "sha256:cd1abe47a5f24da0cdfadff056f7aefe3f8f22a79d5a1892ed35774fbc4fc788",
+              "reportPath": "exact-windows-evidence/core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-win-website-pptx.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "e323d0541f49985dc822b9a78e161d6144610adf",
+            "runId": 46044318964,
+            "runAttempt": 1,
+            "jobName": "Install and inspect the existing Windows package",
+            "artifact": {
+              "id": 15221846710,
+              "name": "exact-package-windows-install-46044318964",
+              "digest": "sha256:488e97343386f66e2ebc9fad02e14c129c4c44dd28fe7799f92bb1698d11ffa8",
+              "reportPath": "exact-windows-evidence/core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-darwin-arm64.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "76e47704eb3d3711d660d9b2f406b7e4b3851200",
+            "runId": 46048665992,
+            "runAttempt": 1,
+            "jobName": "Exact startup appearance on macOS arm64",
+            "artifact": {
+              "id": 15222494691,
+              "name": "exact-mac-startup-appearance-arm64",
+              "digest": "sha256:22103b9af19533405952a19c3bbcca510ebfde49375c21f510b829229323ba4c",
+              "reportPath": "exact-mac-evidence/core-journeys.json"
+            }
+          }
+        },
+        {
+          "path": "docs/qa/release-gates/v0.5.11/core-journeys-darwin-x64.json",
+          "workflowRun": {
+            "repository": "railwise-cn/railwise-ai",
+            "workflowPath": ".github/workflows/windows-install-smoke.yml",
+            "sourceHead": "76e47704eb3d3711d660d9b2f406b7e4b3851200",
+            "runId": 46048665992,
+            "runAttempt": 1,
+            "jobName": "Exact startup appearance on macOS x64",
+            "artifact": {
+              "id": 15223354291,
+              "name": "exact-mac-startup-appearance-x64",
+              "digest": "sha256:1e26eca12a2742e8582afda7e458580cf60807e83fd37e4f10a7753206c85fd9",
+              "reportPath": "exact-mac-evidence/core-journeys.json"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

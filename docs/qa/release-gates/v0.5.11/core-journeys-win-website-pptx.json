@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "version": "0.5.11",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "platform": "win32",
+  "arch": "x64",
+  "installerSha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c",
+  "installedAsarSha256": "a411029ff2fec3580525f26c2368c270d7e6692f7fff62ea4c7cd1c8203b3f62",
+  "buildRunId": 46003137436,
+  "buildRunAttempt": 1,
+  "journeys": [
+    {
+      "id": "website-pptx",
+      "method": "live-model-ui",
+      "status": "passed",
+      "evidence": "windows-ui-smoke.json shows the real model completing the original installed GUI conversation from the public website and opening the editable PPTX.",
+      "proofFile": "windows-install-smoke.json",
+      "proofSha256": "85e6dc1baa9c7bcefb84276a9bf724ce04097c5123d98f2a73cbe13a9390d2e5"
+    }
+  ],
+  "execution": "hosted",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/windows-install-smoke.yml",
+    "sourceHead": "e323d0541f49985dc822b9a78e161d6144610adf",
+    "runId": 46044318964,
+    "runAttempt": 1
+  }
+}

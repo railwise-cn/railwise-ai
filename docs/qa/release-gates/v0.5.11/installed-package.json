@@ -1,0 +1,187 @@
+{
+  "status": "passed",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "version": "0.5.11",
+  "reviewedBuild": {
+    "schemaVersion": 1,
+    "mode": "exact-build",
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/release.yml",
+    "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "headRef": "refs/heads/main",
+    "workflowRef": "railwise-cn/railwise-ai/.github/workflows/release.yml@refs/heads/main",
+    "workflowSha": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "runId": 46003137436,
+    "runAttempt": 1,
+    "publicIdentity": {
+      "bundleId": "com.wangjiawei508.workgpt",
+      "packageName": "workwise",
+      "productName": "RailWise AI"
+    },
+    "artifacts": [
+      {
+        "name": "release-mac",
+        "id": 15202795594,
+        "digest": "sha256:afa6d4174c6124d518a53a2a6cec772a9c2d997996010f3724e49073bbf66cad"
+      },
+      {
+        "name": "release-win",
+        "id": 15201620732,
+        "digest": "sha256:a7f01bbd75a7f06db36a012e7b1953c0c81ef0f67a852e13e59e862e86b499f7"
+      }
+    ],
+    "files": [
+      {
+        "name": "RailWise-AI-0.5.11-mac-arm64.dmg",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 396477169,
+        "sha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-arm64.zip",
+        "platform": "darwin-arm64",
+        "artifact": "release-mac",
+        "size": 403377918,
+        "sha256": "1f7561cdcc8cf75364509997941132c07cef469987b702695e344557819a99c8"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-x64.dmg",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 403477620,
+        "sha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-mac-x64.zip",
+        "platform": "darwin-x64",
+        "artifact": "release-mac",
+        "size": 410586836,
+        "sha256": "e009ecc74f1ec66e5879979f0c1646b8821ff5d7fbf5370432c7580b4c4aa6f0"
+      },
+      {
+        "name": "latest-mac.yml",
+        "platform": "darwin",
+        "artifact": "release-mac",
+        "size": 845,
+        "sha256": "26f5104f2f20c1050f811ea4198878fa4ac3aad895d73616050f12c4d91e62ab"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-win-x64.exe",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 320759899,
+        "sha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c"
+      },
+      {
+        "name": "RailWise-AI-0.5.11-win-x64.exe.blockmap",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 328587,
+        "sha256": "0e23f64f58143f3d10553ade0df5ec949fadb860a753de8200a5461ddbcbde7f"
+      },
+      {
+        "name": "latest.yml",
+        "platform": "win32-x64",
+        "artifact": "release-win",
+        "size": 358,
+        "sha256": "6e61a221dc028393812f8ed0351f51ce623f488e0436f1fa3513ed7691c9bcc2"
+      }
+    ]
+  },
+  "identity": {
+    "bundleId": "com.wangjiawei508.workgpt",
+    "artifactSha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa",
+    "asarSha256": "3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121"
+  },
+  "signature": {
+    "status": "passed",
+    "scope": "macOS Developer ID and recorded Windows Authenticode status",
+    "windowsInstallerAuthenticode": "NotSigned",
+    "windowsExecutableAuthenticode": "NotSigned"
+  },
+  "notarization": {
+    "status": "passed",
+    "scope": "Both macOS architectures verified with Developer ID, stapler and Gatekeeper"
+  },
+  "mac": [
+    {
+      "arch": "arm64",
+      "receipt": "mac-startup-appearance-arm64.json",
+      "installer": {
+        "name": "RailWise-AI-0.5.11-mac-arm64.dmg",
+        "sha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa",
+        "size": 396477169
+      },
+      "installed": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "installedArch": "arm64",
+        "signature": "verified",
+        "notarization": "staple-verified",
+        "asarSha256": "3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121",
+        "developerId": "verified",
+        "gatekeeper": {
+          "assessment": "succeeded",
+          "enforcement": "enabled",
+          "statusCommandExitCode": 0
+        },
+        "updateChannel": "stable"
+      }
+    },
+    {
+      "arch": "x64",
+      "receipt": "mac-startup-appearance-x64.json",
+      "installer": {
+        "name": "RailWise-AI-0.5.11-mac-x64.dmg",
+        "sha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4",
+        "size": 403477620
+      },
+      "installed": {
+        "bundleId": "com.wangjiawei508.workgpt",
+        "installedArch": "x86_64",
+        "signature": "verified",
+        "notarization": "staple-verified",
+        "asarSha256": "5cc664a77cdbdfcb63c65b5f6a8d45030c36411ccdeb5027db2a611f112d9230",
+        "developerId": "verified",
+        "gatekeeper": {
+          "assessment": "succeeded",
+          "enforcement": "enabled",
+          "statusCommandExitCode": 0
+        },
+        "updateChannel": "stable"
+      }
+    }
+  ],
+  "windows": {
+    "artifact": {
+      "name": "exact-package-windows-install-46003137436",
+      "id": 15201426402,
+      "digest": "sha256:0431968299297337fa1e162f1b2513c289d3ca124ff3e59987bd264b00e716d9"
+    },
+    "receipt": "windows-install-smoke.json",
+    "installer": {
+      "path": "D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.11-win-x64.exe",
+      "name": "RailWise-AI-0.5.11-win-x64.exe",
+      "sha256": "48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c",
+      "size": 320759899,
+      "versionInfo": {
+        "fileVersion": "0.5.11",
+        "productVersion": "0.5.11",
+        "productName": "RailWise AI"
+      },
+      "authenticode": {
+        "statusMessage": "The file D:\\a\\_temp\\exact-windows-packages\\RailWise-AI-0.5.11-win-x64.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https://go.microsoft.com/fwlink/?LinkID=135170",
+        "status": "NotSigned",
+        "signerThumbprint": null
+      }
+    },
+    "package": {
+      "name": "workwise",
+      "productName": "RailWise AI",
+      "version": "0.5.11",
+      "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+      "asarSha256": "a411029ff2fec3580525f26c2368c270d7e6692f7fff62ea4c7cd1c8203b3f62",
+      "asarSize": 453238439
+    }
+  }
+}
