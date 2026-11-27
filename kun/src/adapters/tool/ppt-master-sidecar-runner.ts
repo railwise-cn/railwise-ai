@@ -9,11 +9,13 @@ export type RuntimePptMasterSidecarRequest = {
     | 'ppt-master-list-presets'
     | 'ppt-master-render-preset'
     | 'ppt-master-export-pptx'
+    | 'ppt-master-quality-check'
   workspaceRoot: string
   projectPath?: string
   outputPath?: string
   source?: 'output' | 'final'
   format?: 'ppt169' | 'ppt43'
+  stage?: 'first-page' | 'final'
   presetName?: string
   frame?: [number, number, number, number]
   fill?: string
@@ -21,6 +23,9 @@ export type RuntimePptMasterSidecarRequest = {
 
 type RuntimePptMasterSidecarResponse = {
   ok: boolean
+  exitCode?: number
+  reportPath?: string
+  report?: unknown
   stdout?: string
   message?: string
 }

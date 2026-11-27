@@ -23,6 +23,7 @@ ENGINE_VERSION = "markitdown-v0.1.9-workwise-1"
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
 MAX_INPUT_BYTES = 200 * 1024 * 1024
 PPT_MASTER_MAX_REQUEST_PATH = 4096
+PPT_MASTER_MAX_REPORTED_ISSUES = 12
 
 
 def contained(root: Path, target: Path) -> bool:
@@ -73,6 +74,58 @@ def load_script_module(name: str, path: Path) -> Any:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def summarize_ppt_quality_report(report: Any, stage: str) -> dict[str, Any] | None:
+    if not isinstance(report, dict):
+        return None
+    categories = report.get("categories")
+    if not isinstance(categories, dict):
+        return None
+    blocking = categories.get("blocking")
+    introduced = categories.get("introduced")
+    if not isinstance(blocking, dict) or not isinstance(introduced, dict):
+        return None
+
+    def compact_issues(value: Any) -> list[dict[str, str]]:
+        if not isinstance(value, list):
+            return []
+        items: list[dict[str, str]] = []
+        for issue in value[:PPT_MASTER_MAX_REPORTED_ISSUES]:
+            if not isinstance(issue, dict):
+                continue
+            compact: dict[str, str] = {}
+            file_name = issue.get("file")
+            message = issue.get("message")
+            if isinstance(file_name, str):
+                compact["file"] = Path(file_name).name[:128]
+            if isinstance(message, str):
+                compact["message"] = message[:240]
+            if compact:
+                items.append(compact)
+        return items
+
+    summary = report.get("summary")
+    blocking_issues = blocking.get("issues") if isinstance(blocking.get("issues"), list) else []
+    introduced_issues = introduced.get("issues") if isinstance(introduced.get("issues"), list) else []
+    compact_summary = {
+        key: value for key, value in summary.items()
+        if key in {"total", "passed", "warnings", "errors"} and isinstance(value, int)
+    } if isinstance(summary, dict) else {}
+    return {
+        "schema": report.get("schema"),
+        "stage": stage,
+        "summary": compact_summary,
+        "categories": {
+            "blocking": {
+                "count": blocking.get("count") if isinstance(blocking.get("count"), int) else len(blocking_issues),
+                "issues": compact_issues(blocking_issues),
+            },
+            "introduced": {
+                "count": introduced.get("count") if isinstance(introduced.get("count"), int) else len(introduced_issues),
+            },
+        },
+    }
 
 
 def call_ppt_master(operation: str, request: dict[str, Any]) -> dict[str, Any]:
@@ -252,6 +305,9 @@ def call_ppt_master(operation: str, request: dict[str, Any]) -> dict[str, Any]:
                             "--json",
                         ]
                         exit_code = int(module.main() or 0)
+                    except SystemExit as error:
+                        raw_code = error.code
+                        exit_code = raw_code if isinstance(raw_code, int) else 1
                     finally:
                         sys.argv = previous_argv
                     report_name = (
@@ -263,7 +319,9 @@ def call_ppt_master(operation: str, request: dict[str, Any]) -> dict[str, Any]:
                     report: dict[str, Any] | None = None
                     if report_path.is_file():
                         try:
-                            report = json.loads(report_path.read_text("utf-8"))
+                            report = summarize_ppt_quality_report(
+                                json.loads(report_path.read_text("utf-8")), stage
+                            )
                         except Exception:
                             report = None
                     quality_check_payload = {

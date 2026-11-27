@@ -1282,6 +1282,9 @@ export class AgentLoop {
       ...(effectiveToolSpecs.some(tool => tool.name === 'read_skill_resource')
         ? ['Read relative Skill references with read_skill_resource and the ID in the matching Active Skill heading. Use next_offset_bytes to continue a partial read.']
         : []),
+      ...(effectiveToolSpecs.some(tool => tool.name === 'ppt_master_quality_check')
+        ? ['For PPT Master in RailWise, run ppt_master_quality_check with stage="final" after the final SVGs and before ppt_master_export or ppt_master. Fix reported issues by editing the relevant project files. Use these built-in tools for quality checking and PPTX export instead of host-shell commands.']
+        : []),
       ...(occurrenceTask?.scheduledBy ? [
         `Scheduled task occurrence (server-owned): ${JSON.stringify({ taskId: occurrenceTask.id,
           scheduleId: occurrenceTask.scheduledBy.scheduleId, dueAt: occurrenceTask.scheduledBy.dueAt, phase: 'due_execution' })}`,
