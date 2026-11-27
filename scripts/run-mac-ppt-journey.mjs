@@ -165,9 +165,10 @@ async function readArtifactOpenFailure(cdp) {
   })()`)
 }
 
-async function waitForNativeMacDocument(cdp, filename) {
+async function waitForNativeMacDocument(cdp, filename, artifactPath) {
   const deadline = Date.now() + 60_000
   const baseName = filename.replace(/\.pptx$/i, '')
+  const lockPath = artifactPath ? join(dirname(artifactPath), `.~lock.${filename}#`) : ''
   const defaultHandler = readPptxDefaultHandler()
   let lastObservation = { defaultHandler, processes: [], windows: [], frontmostProcess: '', systemEventsError: '', renderer: null }
   while (Date.now() < deadline) {
@@ -175,12 +176,17 @@ async function waitForNativeMacDocument(cdp, filename) {
     const processResult = spawnSync('/bin/ps', ['-axo', 'comm='], { encoding: 'utf8', timeout: 3_000, stdio: ['ignore', 'pipe', 'pipe'] })
     const processes = processResult.status === 0 ? processResult.stdout.split(/\r?\n/).map(name => name.trim()).filter(Boolean)
       .filter(name => /LibreOffice|soffice/i.test(name)) : []
+    const lockOpened = lockPath ? await stat(lockPath).then(info => info.isFile(), () => false) : false
     const renderer = await readArtifactOpenFailure(cdp).catch(error => ({ statusReadError: error.message }))
     lastObservation = { defaultHandler, processes, windows: system.windows, frontmostProcess: system.frontmostProcess,
-      systemEventsError: system.error, renderer }
+      lockOpened, systemEventsError: system.error, renderer }
     const documentWindow = system.windows.find(window => window.title.includes(filename) || window.title.includes(baseName))
     if (documentWindow) return { status: 'os-open-accepted', application: documentWindow.processName, windowTitle: documentWindow.title,
       defaultHandler, observation: lastObservation }
+    if (processes.length > 0 && lockOpened && !renderer.visibleFailure) {
+      return { status: 'os-open-accepted', application: 'LibreOffice', windowTitle: filename,
+        defaultHandler, observation: lastObservation }
+    }
     if (renderer.visibleFailure) {
       throw Object.assign(new Error(`The installed app showed an artifact-open failure for ${filename}`), { webPptDiagnostics: lastObservation })
     }
@@ -190,10 +196,10 @@ async function waitForNativeMacDocument(cdp, filename) {
     { webPptDiagnostics: lastObservation })
 }
 
-async function readNativeOpenResult(cdp, { artifact }) {
+async function readNativeOpenResult(cdp, { artifact, path }) {
   const filename = artifact.relativePath.split(/[\\/]/).at(-1)
   assert.ok(filename)
-  return waitForNativeMacDocument(cdp, filename)
+  return waitForNativeMacDocument(cdp, filename, path)
 }
 
 export async function runInstalledMacPptJourney({ executable, temporary, evidenceDir, version, installedAsarSha256,
