@@ -65,11 +65,13 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/run-mac-offline-spreadsheet-journey.mjs',
   'scripts/run-mac-offline-spreadsheet-journey.test.mjs',
   'scripts/run-mac-ppt-journey.mjs',
+  'scripts/run-mac-ppt-journey.test.mjs',
   'scripts/run-mac-startup-appearance-smoke.mjs',
   'scripts/run-windows-install-smoke.ps1',
   'scripts/run-windows-offline-spreadsheet-journey.mjs',
   'scripts/run-windows-offline-spreadsheet-journey.test.mjs',
   'scripts/web-ppt-journey.mjs',
+  'scripts/web-ppt-approval.test.mjs',
   'scripts/verify-windows-install-smoke.mjs',
   'scripts/verify-windows-startup-appearance.test.mjs',
   'scripts/verify-reviewed-release-artifacts.mjs',
@@ -83,6 +85,7 @@ const PACKAGE_EXTERNAL_EVIDENCE_FILES = new Set([
   'scripts/windows-ui-smoke.test.mjs',
   'scripts/macos-updater-trust.test.mjs',
   // Excluded by kun/tsconfig.build.json and the runtime packaging filter.
+  'kun/src/loop/agent-loop.test.ts',
   'kun/src/services/task-controller.test.ts',
   'kun/src/services/web-artifact-evidence.test.ts',
   'docs/MIGRATION_RELEASE_IDENTITY.zh-CN.md',
@@ -536,7 +539,7 @@ export function verifyReleaseApproval({
       changedPaths: requirements.changedPaths, releaseHead: sourceHead
     })
     : []
-  if (requirements.updater && !acceptance.updaterRoundTrip) fail('this release changes updater/download paths and requires one exact-package updater smoke')
+  if ((requirements.updater || coreJourneysRequired) && !acceptance.updaterRoundTrip) fail('this release changes updater/download paths and requires one exact-package updater smoke')
   const updaterEvidence = acceptance.updaterRoundTrip
     ? requireUpdaterEvidence(acceptance.updaterRoundTrip, reviewedBuild, packageIdentity, version, sourceHead)
     : null
@@ -566,7 +569,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     if (process.env.GITHUB_ACTIONS === 'true' || process.argv.includes('--verify-source')) {
       verifyReviewedBuildSource(result.reviewedBuild, { version: result.version, sourceHead: result.reviewedSourceHead,
         requiredSourceJobs: result.reviewedBuild.mode === 'exact-build'
-          ? ['Private exact-package Windows install smoke', ...(result.requirements.updater ? ['Private exact-package updater smoke'] : [])] : [] })
+          ? ['Private exact-package Windows install smoke', ...((result.requirements.updater || requiresCoreJourneys(result.version)) ? ['Private exact-package updater smoke'] : [])] : [] })
       if (result.requiredCI) verifyRequiredCI(result.requiredCI, result.requiredCI.sourceHead)
       verifyRemoteCoreJourneyReceipts(result.coreJourneyReceipts)
       verifyPreviousFormalRelease(result.requirements.previousTag)

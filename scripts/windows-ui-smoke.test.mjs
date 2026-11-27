@@ -177,11 +177,11 @@ test('the original task question submits through its exact user-input endpoint',
   assert.match(source, /answers:\s*\[\{\s*id:\s*activeTaskComposerQuestion\.questionId,\s*label:\s*activeTaskComposerQuestion\.label,\s*value:\s*v\s*\}\]/s)
 })
 
-test('the isolated pause/restart task acceptance requires a visible on-request approval policy', () => {
+test('the isolated pause/restart task acceptance uses default auto policy so explicit host-shell approval is exercised once', () => {
   const common = { workspace: 'D:\\acceptance\\workspace', dataDir: 'D:\\acceptance\\runtime', port: 43123,
     configuredModel: true, providerId: 'fixture', model: 'fixture', apiKey: 'synthetic-local-only',
     baseUrl: 'http://127.0.0.1:43124/v1', webPpt: true }
-  assert.equal(buildWindowsSmokeSettings({ ...common, pauseRestartSmoke: true }).agents.kun.approvalPolicy, 'on-request')
+  assert.equal(buildWindowsSmokeSettings({ ...common, pauseRestartSmoke: true }).agents.kun.approvalPolicy, 'auto')
   assert.equal(buildWindowsSmokeSettings({ ...common, pauseRestartSmoke: false }).agents.kun.approvalPolicy, 'auto')
   assert.throws(() => buildWindowsSmokeSettings({ ...common, webPpt: false, pauseRestartSmoke: true }), /requires the website-to-PPT journey/)
 })

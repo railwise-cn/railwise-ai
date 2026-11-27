@@ -2165,7 +2165,16 @@ export class AgentLoop {
       delegationPolicy: this.opts.delegationPolicy ?? { enabled: false },
       ...(input.allowedToolNames ? { allowedToolNames: input.allowedToolNames } : {}),
       ...(input.allowedMcpProviderIds ? { allowedMcpProviderIds: input.allowedMcpProviderIds } : {}),
-      ...(input.executionGrant ? { executionGrant: input.executionGrant, validateExecutionGrant: () => this.validateGrant(input.executionGrant!) } : {}),
+      ...(input.executionGrant ? {
+        executionGrant: input.executionGrant,
+        validateExecutionGrant: () => this.validateGrant(input.executionGrant!),
+        ...(input.executionGrant.taskId && this.opts.tasks
+          ? {
+              isTaskWebReadOriginApproved: (origin: string) =>
+                taskHasApprovedWebReadOrigin(this.opts.tasks!, input.executionGrant!, input.threadId, origin)
+            }
+          : {})
+      } : {}),
       approvalPolicy: input.approvalPolicy,
       sandboxMode: input.sandboxMode,
       abortSignal: input.signal,

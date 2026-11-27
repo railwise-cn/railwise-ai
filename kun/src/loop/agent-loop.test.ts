@@ -10,6 +10,9 @@ import {
 } from './agent-loop.js'
 import type { ModelClient, ModelRequest, ModelToolSpec } from '../ports/model-client.js'
 import type { ToolHost } from '../ports/tool-host.js'
+import { CapabilityRegistry } from '../adapters/tool/capability-registry.js'
+import { LocalToolHost } from '../adapters/tool/local-tool-host.js'
+import type { ApprovalRequest } from '../domain/approval.js'
 import { InMemoryThreadStore } from '../adapters/in-memory-thread-store.js'
 import { InMemorySessionStore } from '../adapters/in-memory-session-store.js'
 import { InMemoryEventBus } from '../adapters/in-memory-event-bus.js'
@@ -99,7 +102,8 @@ describe('trusted task waits', () => {
       usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso, tasks,
       ...(preflight ? { workspaceTrust: { get: async () => ({ canonicalRoot: '', level: 'read-only' as const, revision: 0 }) },
         executionScope: async () => { throw Object.assign(new Error('公开查询恢复范围已变化。'), { code: 'browser_public_query_recovery_changed' }) } } : {}) })
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     expect(modelCalls).toBe(preflight ? 0 : trusted ? 1 : 2)
     expect(toolCalls).toBe(preflight ? 0 : 1)
     expect(completedTasks).toBe(preflight || trusted ? 0 : 1)
@@ -366,6 +370,146 @@ describe('task-scoped web approval lookup', () => {
 
     expect(taskHasApprovedWebReadOrigin(tasks, { taskId: 'task-missing' }, threadId, origin)).toBe(false)
   })
+
+  it('reuses a task-scoped web read origin approval across sequential tool executions in AgentLoop', async () => {
+    const nowIso = () => new Date().toISOString()
+    const threadStore = new InMemoryThreadStore()
+    const sessionStore = new InMemorySessionStore()
+    const eventBus = new InMemoryEventBus()
+    const ids = new SequentialIdGenerator()
+    const inflight = new InflightTracker()
+    const steering = new SteeringQueue()
+    const compactor = new ContextCompactor()
+    const userInputGate = new InMemoryUserInputGate()
+    const events = new RuntimeEventRecorder({
+      eventBus, sessionStore, allocateSeq: id => eventBus.allocateSeq(id), nowIso
+    })
+    const turns = new TurnService({
+      threadStore, sessionStore, events, inflight, steering, compactor, ids, nowIso
+    })
+    const activeTask = {
+      id: 'task-web-origin-reuse',
+      threadId,
+      attempts: 1,
+      authority: { approvedWebReadOrigins: [] as Array<typeof approval> }
+    }
+    const requestedApprovals: ApprovalRequest[] = []
+    class AutoTaskOriginApprovalGate extends InMemoryApprovalGate {
+      override request(req: ApprovalRequest): Promise<'allow' | 'deny'> {
+        requestedApprovals.push(req)
+        const pending = super.request(req)
+        queueMicrotask(() => {
+          if (req.networkReadOrigin) {
+            activeTask.authority.approvedWebReadOrigins.push({
+              origin: req.networkReadOrigin,
+              approvalId: req.id,
+              turnId: req.turnId,
+              approvedAt: nowIso()
+            })
+          }
+          this.decide(req.id, 'allow')
+        })
+        return pending
+      }
+    }
+    const approvalGate = new AutoTaskOriginApprovalGate()
+    const tasks = {
+      activeTask: () => activeTask,
+      getTask: (id: string) => (id === activeTask.id ? activeTask : null),
+      managedArtifactRoot: () => undefined,
+      registerExecutionAbort: () => () => undefined,
+      beginAttempt: () => activeTask,
+      pendingDeliveries: () => [],
+      tokenForTurn: () => undefined,
+      beginWork: () => () => undefined,
+      workBudget: () => undefined,
+      recordCost: () => undefined,
+      beginToolOperation: () => undefined,
+      endRun: () => undefined,
+      suspendWebArtifactProgress: async () => null,
+      recordAttemptFailure: (_thread: string, _turn: string, code: string, message: string) => ({
+        kind: 'failed',
+        reason: `${code}: ${message}`,
+        task: activeTask
+      }),
+      assessCandidate: async () => ({ kind: 'completed', task: activeTask })
+    } as unknown as TaskController
+
+    const fetchedUrls: string[] = []
+    const toolHost = new LocalToolHost({
+      registry: new CapabilityRegistry([{
+        id: 'web',
+        kind: 'built-in',
+        enabled: true,
+        available: true,
+        tools: [{
+          name: 'web_fetch',
+          description: 'Read public web page',
+          inputSchema: { type: 'object', properties: { url: { type: 'string' } }, required: ['url'] },
+          toolKind: 'tool_call',
+          policy: 'untrusted',
+          hasScopedApproval: async (args, context) => {
+            const targetOrigin = new URL(String(args.url)).origin
+            return Boolean(context.isTaskWebReadOriginApproved?.(targetOrigin))
+          },
+          approvalNetworkReadOrigin: async (args) => new URL(String(args.url)).origin,
+          approvalSummary: async (args) => `Read public web page\nOrigin: ${new URL(String(args.url)).origin}\nEffect: Read page content only.`,
+          execute: async (args) => {
+            const url = String(args.url)
+            fetchedUrls.push(url)
+            return { output: { finalUrl: url, text: '工程测量 · 自动化监测' } }
+          }
+        }]
+      }])
+    })
+
+    let step = 0
+    const model: ModelClient = {
+      provider: 'test',
+      model: 'fixture-model',
+      async *stream() {
+        step += 1
+        if (step === 1) {
+          yield { kind: 'tool_call_complete', callId: 'fetch-home', toolName: 'web_fetch', arguments: { url: 'https://www.railwise.cn/' } }
+          yield { kind: 'completed', stopReason: 'tool_calls' }
+          return
+        }
+        if (step === 2) {
+          yield { kind: 'tool_call_complete', callId: 'fetch-about', toolName: 'web_fetch', arguments: { url: 'https://www.railwise.cn/about' } }
+          yield { kind: 'completed', stopReason: 'tool_calls' }
+          return
+        }
+        yield { kind: 'assistant_text_delta', text: '已完成官网两页公开资料读取。' }
+        yield { kind: 'completed', stopReason: 'stop' }
+      }
+    }
+
+    await threadStore.upsert(createThreadRecord({
+      id: threadId,
+      title: 'Web origin reuse',
+      workspace: '',
+      model: model.model,
+      approvalPolicy: 'on-request',
+      sandboxMode: 'read-only',
+      createdAt: nowIso()
+    }))
+    const started = await turns.startTurn({
+      threadId,
+      request: { prompt: '读取 https://www.railwise.cn/ 与关于页公开资料。' }
+    })
+    const loop = new AgentLoop({
+      threadStore, sessionStore, approvalGate, userInputGate, model, toolHost,
+      usage: new UsageService(), events, turns, inflight, steering, compactor,
+      prefix: createImmutablePrefix(), ids, nowIso, tasks,
+      workspaceTrust: { get: async () => ({ canonicalRoot: '', level: 'read-only' as const, revision: 0 }) }
+    })
+
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
+    expect(fetchedUrls).toEqual(['https://www.railwise.cn/', 'https://www.railwise.cn/about'])
+    expect(requestedApprovals).toHaveLength(1)
+    expect(requestedApprovals[0]?.networkReadOrigin).toBe('https://www.railwise.cn')
+  })
 })
 
 describe('resolvePlanModeToolSpecs', () => {
@@ -535,7 +679,8 @@ describe('AgentLoop completion guard', () => {
     const started = await turns.startTurn({ threadId, request: { prompt: '读取合成页面。' } })
     const loop = new AgentLoop({ threadStore, sessionStore, approvalGate: new InMemoryApprovalGate(), userInputGate: new InMemoryUserInputGate(), model,
       toolHost, usage: new UsageService(), events, turns, inflight, steering, compactor, prefix: createImmutablePrefix(), ids, nowIso })
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     expect(dispatched).toEqual([{}])
     expect(requests[1].toolArgumentAvailability).toContainEqual({ turnId: started.turnId, callId: 'start-current', state: 'available' })
     expect(requests[1].history.find(item => item.kind === 'tool_call')).toMatchObject({ arguments: {} })
@@ -588,7 +733,8 @@ describe('AgentLoop completion guard', () => {
       prefix: createImmutablePrefix(), ids, nowIso
     })
 
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     const persistedEvents = await sessionStore.loadEventsSince(threadId, 0)
     const toolDelta = persistedEvents.find((event) => event.kind === 'tool_call_delta')
     expect(toolDelta).toMatchObject({
@@ -701,7 +847,8 @@ describe('AgentLoop completion guard', () => {
       prefix: createImmutablePrefix(), ids, nowIso, tasks, spanService
     })
 
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     expect(starts.map((span) => span.kind)).toEqual(['model', 'mcp', 'model'])
     expect(JSON.stringify(starts)).not.toContain('secret')
     expect(finishes.find((entry) => entry.id.includes('span_model'))?.input).toMatchObject({
@@ -785,7 +932,8 @@ describe('AgentLoop completion guard', () => {
       prefix: createImmutablePrefix(), ids, nowIso
     })
 
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     expect(requestModel).toBe('review-model')
     expect(requestInstructions.join('\n')).toContain('只读审查并给出证据。')
     expect(requestTools).toEqual(['read'])
@@ -890,7 +1038,8 @@ describe('AgentLoop completion guard', () => {
       nowIso
     })
 
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
 
     const items = await sessionStore.loadItems(threadId)
     const persistedEvents = await sessionStore.loadEventsSince(threadId, 0)
@@ -972,7 +1121,8 @@ describe('AgentLoop completion guard', () => {
       prefix: createImmutablePrefix(), ids, nowIso, tasks
     })
 
-    await expect(loop.runTurn(threadId, started.turnId)).resolves.toBe('completed')
+    const outcome = await loop.runTurn(threadId, started.turnId)
+    expect(outcome, JSON.stringify((await threadStore.get(threadId))?.turns)).toBe('completed')
     expect(modelSteps).toBe(1)
     const items = await sessionStore.loadItems(threadId)
     expect(items.filter((item) => item.kind === 'error')).toHaveLength(0)
