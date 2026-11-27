@@ -11,7 +11,7 @@ export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
 export const webPptMonitoringTopic = /自动化监测|工程监测|变形监测|安全监测/
 export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和自动化监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
-export const liveWebPptJourneyPrompt = `${webPptJourneyPrompt}请直接使用内置文件工具（write）以及 ppt_master_quality_check、ppt_master_export 工具在工作区制作并导出，不要调用 request_host_shell 执行任何本机命令。`
+export const liveWebPptJourneyPrompt = `${webPptJourneyPrompt}制作要求：1）只读写当前工作区 deck/ 下的相对路径，不要调用 request_host_shell、ppt_master 或访问工作区外路径；2）先用 write 写入 deck/spec_lock.md（首行 <!-- ppt-master-schema: spec-lock/v1 -->，包含 ## canvas 的 viewBox: 0 0 1280 720 与 format: ppt169、## colors 的 bg/primary/accent/text、## typography 的 font_family/title_family/body_family: Arial 及 body: 18 和 title: 36、## pptx_structure 的 mode: flat、## communication 的 primary_language: zh-CN），再用 write 写入单页 deck/svg_output/slide_01.svg（1280x720 纯 <rect> 与不重叠的 <text> 元素，包含官网读取到的工程测量与自动化监测要点及来源 www.railwise.cn）；3）每次修改 SVG 后必须紧接着执行 ppt_master_quality_check（project_path="deck", stage="final"），通过后不再改文件并立即调用 ppt_master_export（project_path="deck", output_path="deck/website.pptx", source="output", format="ppt169"）。`
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
