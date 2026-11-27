@@ -96,6 +96,21 @@ test('exact-build verifies and copies the same artifact bytes without requiring 
   for (const file of f.build.files) assert.equal(sha(readFileSync(join(f.output, file.name))), file.sha256)
 })
 
+test('exact-build on main verifies retained reviewed-build.json when public-identity receipts exist', async t => {
+  const f = fixture(t)
+  Object.assign(f.build, { mode: 'exact-build', headRef: 'refs/heads/main', workflowRef: RELEASE_WORKFLOW_REF, workflowSha: sourceHead })
+  const result = await f.verify()
+  assert.equal(result.files, 8)
+  assert.deepEqual(readdirSync(f.output).sort(), f.build.files.map(file => file.name).sort())
+  assert.equal(existsSync(join(f.output, 'reviewed-build.json')), false)
+
+  const invalid = fixture(t)
+  Object.assign(invalid.build, { mode: 'exact-build', headRef: 'refs/heads/main', workflowRef: RELEASE_WORKFLOW_REF, workflowSha: sourceHead })
+  writeFileSync(join(invalid.downloads, 'release-win', 'reviewed-build.json'), '{}')
+  await assert.rejects(invalid.verify)
+  assert.equal(existsSync(invalid.output), false)
+})
+
 test('exact-build mode cannot relax the exact file set, file integrity, source, identity or branch ref', async t => {
   const changes = {
     missing: f => rmSync(join(f.downloads, 'release-win', 'latest.yml')),

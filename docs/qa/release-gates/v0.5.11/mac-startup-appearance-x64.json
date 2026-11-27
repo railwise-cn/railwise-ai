@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "source": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflow": ".github/workflows/release.yml",
+    "packageMode": "frozen-public-identity",
+    "runId": 46003137436,
+    "runAttempt": 1,
+    "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+    "driverHead": "76e47704eb3d3711d660d9b2f406b7e4b3851200",
+    "buildConclusion": "success",
+    "artifactName": "release-mac",
+    "artifactId": 15202795594,
+    "artifactDigest": "sha256:afa6d4174c6124d518a53a2a6cec772a9c2d997996010f3724e49073bbf66cad",
+    "artifactExpired": false,
+    "changedFiles": [
+      ".github/workflows/windows-install-smoke.yml",
+      "scripts/run-mac-ppt-journey.mjs",
+      "scripts/run-windows-frozen-gui-upgrade.mjs",
+      "scripts/verify-release-approval.mjs",
+      "scripts/web-ppt-approval.test.mjs",
+      "scripts/web-ppt-journey.mjs",
+      "scripts/windows-ui-smoke.test.mjs"
+    ]
+  },
+  "packageMode": "frozen-public-identity",
+  "arch": "x64",
+  "version": "0.5.11",
+  "installer": {
+    "name": "RailWise-AI-0.5.11-mac-x64.dmg",
+    "sha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4",
+    "size": 403477620
+  },
+  "installed": {
+    "bundleId": "com.wangjiawei508.workgpt",
+    "installedArch": "x86_64",
+    "signature": "verified",
+    "notarization": "staple-verified",
+    "asarSha256": "5cc664a77cdbdfcb63c65b5f6a8d45030c36411ccdeb5027db2a611f112d9230"
+  },
+  "observations": [
+    {
+      "title": "RailWise AI",
+      "subtitle": "基于本地优先架构的智能协同工作台",
+      "subtitleLang": "zh-CN",
+      "theme": "light",
+      "locale": "en",
+      "viewport": {
+        "width": 360,
+        "height": 248,
+        "scale": 1
+      },
+      "versionVisible": false,
+      "progress": 18,
+      "status": "Preparing workspace",
+      "geometry": {
+        "logo": {
+          "left": 124.203125,
+          "top": 22.078125,
+          "right": 235.796875,
+          "bottom": 84.078125,
+          "width": 111.59375,
+          "height": 62
+        },
+        "title": {
+          "left": 122.484375,
+          "top": 93.984375,
+          "right": 237.5,
+          "bottom": 119.890625,
+          "width": 115.015625,
+          "height": 25.90625
+        },
+        "subtitle": {
+          "left": 76,
+          "top": 124.890625,
+          "right": 284,
+          "bottom": 143.078125,
+          "width": 208,
+          "height": 18.1875
+        },
+        "bar": {
+          "left": 50,
+          "top": 201.53125,
+          "right": 310,
+          "bottom": 203.53125,
+          "width": 260,
+          "height": 2
+        },
+        "status": {
+          "left": 50,
+          "top": 210.53125,
+          "right": 310,
+          "bottom": 225.921875,
+          "width": 260,
+          "height": 15.390625
+        },
+        "textLines": [
+          {
+            "left": 76,
+            "top": 123.890625,
+            "right": 284,
+            "bottom": 142.890625,
+            "width": 208,
+            "height": 19
+          }
+        ]
+      },
+      "workbenchTypography": {
+        "fontFamily": "\"RailWise UI\", system-ui, sans-serif",
+        "fontSize": "13px",
+        "lineHeight": "19.5px",
+        "devicePixelRatio": 1,
+        "window": {
+          "width": 1280,
+          "height": 840
+        },
+        "fonts": [
+          {
+            "familyName": "Noto Sans SC Thin",
+            "postScriptName": "NotoSansSC-Thin_Medium",
+            "isCustomFont": true,
+            "glyphCount": 10
+          }
+        ]
+      },
+      "workbenchOpened": true,
+      "processExit": {
+        "code": null,
+        "signal": "SIGTERM"
+      },
+      "captureAttempts": 1
+    },
+    {
+      "title": "RailWise AI",
+      "subtitle": "基于本地优先架构的智能协同工作台",
+      "subtitleLang": "zh-CN",
+      "theme": "dark",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 360,
+        "height": 248,
+        "scale": 1
+      },
+      "versionVisible": false,
+      "progress": 82,
+      "status": "正在打开工作台",
+      "geometry": {
+        "logo": {
+          "left": 124.203125,
+          "top": 22.078125,
+          "right": 235.796875,
+          "bottom": 84.078125,
+          "width": 111.59375,
+          "height": 62
+        },
+        "title": {
+          "left": 122.484375,
+          "top": 93.984375,
+          "right": 237.5,
+          "bottom": 119.890625,
+          "width": 115.015625,
+          "height": 25.90625
+        },
+        "subtitle": {
+          "left": 76,
+          "top": 124.890625,
+          "right": 284,
+          "bottom": 143.078125,
+          "width": 208,
+          "height": 18.1875
+        },
+        "bar": {
+          "left": 50,
+          "top": 201.53125,
+          "right": 310,
+          "bottom": 203.53125,
+          "width": 260,
+          "height": 2
+        },
+        "status": {
+          "left": 50,
+          "top": 210.53125,
+          "right": 310,
+          "bottom": 225.921875,
+          "width": 260,
+          "height": 15.390625
+        },
+        "textLines": [
+          {
+            "left": 76,
+            "top": 123.890625,
+            "right": 284,
+            "bottom": 142.890625,
+            "width": 208,
+            "height": 19
+          }
+        ]
+      },
+      "workbenchTypography": {
+        "fontFamily": "\"RailWise UI\", system-ui, sans-serif",
+        "fontSize": "13px",
+        "lineHeight": "19.5px",
+        "devicePixelRatio": 1,
+        "window": {
+          "width": 1280,
+          "height": 840
+        },
+        "fonts": [
+          {
+            "familyName": "Noto Sans SC Thin",
+            "postScriptName": "NotoSansSC-Thin_Medium",
+            "isCustomFont": true,
+            "glyphCount": 4
+          }
+        ]
+      },
+      "workbenchOpened": true,
+      "processExit": {
+        "code": 0,
+        "signal": null
+      },
+      "captureAttempts": 1,
+      "screenshot": {
+        "name": "mac-startup-zh-dark.png",
+        "sha256": "f0d5fa76efb622739002203cef63f83d9c068eeb4f70d45a0f832c1b7e3e9b83",
+        "size": 17562
+      }
+    }
+  ],
+  "offlineSpreadsheet": {
+    "status": "passed",
+    "file": "mac-offline-spreadsheet.json"
+  }
+}

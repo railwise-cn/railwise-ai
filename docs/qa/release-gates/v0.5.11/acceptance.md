@@ -317,3 +317,26 @@ Release run `45651308510` 的精确 Windows 安装检查及 macOS 原地升级 s
 本地源码和 sidecar 结果不代表候选安装包验收。真实模型网站到 PPT 的 Mac/Windows 精确包旅程仍未通过；新候选必须确认资源读取错误消失、最终质检工具实际调用、不会转为未授权主机命令审批、PPTX 可编辑并在原对话打开。首次候选验证和 Windows 路径断言失败详见本节末的 PR #136 与 Release run `45916446346` 记录。修正后的三端候选 run `45919711965` 正在构建，尚无安装包验收结果。正式 Stable 仍是 `0.5.10`，`0.5.11` 未发布。
 
 PR #136 的 Quality checks 已通过，当前提交为 `a98c70a190489f7f8d26d623663ac564b404f7e5`。隔离三端候选 Release run `45916446346` 首次在 Windows sidecar 往返验证阶段失败。Windows sidecar 实际返回 `exitCode=0`、`ppt-master.svg-quality-report.v1`、`stage=final` 和 `blockingCount=0`；失败仅因验收器把 Windows 的 `validation\\svg_quality_report.json` 按 POSIX 分隔符比较。现已将验收路径规范化为 `/`。该 run 未生成应用安装包，不能提供任何候选安装验收结果。修正后的三端候选 run `45919711965` 已启动，Mac 签名构建仍在进行，完成后再做精确包安装与真实模型验收。
+
+## 2026-11-28 三层分级门禁收口与最终候选全量验收
+
+本轮完成网页只读审批同源复用修复（`kun/src/loop/agent-loop.ts` 在 `createToolContext` 注入 `isTaskWebReadOriginApproved`）并合入 `main`（提交 `a435bb924176f062244724aa0120b49e84ab6d98`，Quality CI `45982520268` 三项必需作业全部通过），同步将发布门禁重构为经维护者确认的三层分级标准（Tier 1 跨端冷启动、双端 `0.5.10 → 0.5.11` 真实原地升级、Mac 签名公证与离线表格；Tier 2 改动驱动核心旅程；Tier 3 实体网络与已登录第三方站点作为可选现场回执登记）。
+
+最终公共身份三端候选由 `main` 上的 Release workflow `46003137436`（`candidate_only=true`、`prepare_public_artifacts=true`、`publish_release=false`、`exact_package_updater_smoke=true`）生成并完成校验：
+
+- **macOS Apple Silicon (`darwin-arm64`)**：`RailWise-AI-0.5.11-mac-arm64.dmg`（396,477,169 bytes，SHA-256 `976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa`），实装 ASAR SHA-256 `3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121`，Developer ID 签名、公证票据装订及 Gatekeeper 校验通过。
+- **macOS Intel (`darwin-x64`)**：`RailWise-AI-0.5.11-mac-x64.dmg`（403,477,620 bytes，SHA-256 `b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4`），实装 ASAR SHA-256 `5cc664a77cdbdfcb63c65b5f6a8d45030c36411ccdeb5027db2a611f112d9230`，Developer ID 签名、公证票据装订及 Gatekeeper 校验通过。
+- **Windows x64 (`win32-x64`)**：`RailWise-AI-0.5.11-win-x64.exe`（320,759,899 bytes，SHA-256 `48a7213352020114052dc59795e90771e3a048a81f4598bf4fed6e4fbc684d9c`），实装 ASAR SHA-256 `a411029ff2fec3580525f26c2368c270d7e6692f7fff62ea4c7cd1c8203b3f62`（Authenticode 记录为 `NotSigned`）。
+
+全部 Tier 1 与 Tier 2 必跑实装回执均绑定同一批制品 `46003137436` 并通过验证：
+
+| 层级与平台 | 验收旅程 | Actions Run / Artifact | 结果与验证范围 |
+| --- | --- | --- | --- |
+| Tier 1 · macOS `arm64` | `0.5.10 → 0.5.11` 原生升级往返 | `46003137436` / `15204276064` | 通过。从官方 `v0.5.10` DMG 原生下载并升级至 `0.5.11` ZIP，无浏览器回退，工程与测量历史数据、任务状态及配置引用逐字节保留。 |
+| Tier 1 · Windows `x64` | `startup-branding` 及精确安装/卸载 | `46003137436` (`15201426402`)、`46005705727` (`15202091552`) | 通过。冷启动品牌全称、无版本行、中文工作台、技能/插件/连接器与 13 章离线帮助及干净卸载全部核对通过。 |
+| Tier 1 · Windows `x64` | `windows-updater-sidebar`、`windows-updater-settings` | `46041525422` / `15220716595`、`15219888475` | 通过。从官方 `0.5.10` 分别通过左下角侧栏与设置页原地升级到 `0.5.11`，自动重启后会话、工作区、偏好与新版更新提示读回一致。 |
+| Tier 1 · macOS `arm64` & `x64` | `startup-branding`、`offline-spreadsheet` | `46048665992` / `15222494691`、`15223354291` | 通过。双架构中英文冷启动画面、字体渲染及断网 Univer 1.6.2 多表编辑、公式 `=SUM(4,5)`、撤销、冲突另存、中文 CSV 与 XLSX 只读预览全部通过。 |
+| Tier 2 · Windows `x64` | `pause-restart-recovery` | `46041543808` / `15220012889` | 通过。开放问题阶段暂停任务、关闭并重启应用后原问题只读保留，继续任务后原会话答复、单次归属审批并完成可编辑 PPTX 交付。 |
+| Tier 2 · Windows `x64` & macOS `arm64` | `website-pptx` (`live-model-ui`) | `46044318964` (`15221846710`)、`46048665992` (`15222494691`) | 通过。真实 `deepseek-flash` 模型在原对话询问资料，补交 `www.railwise.cn` 并单次批准只读网页范围后，同源连续读取网页、通过 `ppt_master_quality_check(stage="final")` 质检、生成可编辑 OOXML PPTX 并从正文打开文件。 |
+
+Tier 3 现场环境项（大陆普通家庭网络实体 Windows、已登录 Ego Space / 大单网现场采集）按分级门禁保留为可选现场验证项，不冒充托管环境已测结论。全部发布证据已汇总至 `docs/qa/release-gates/v0.5.11.json`，等待维护者确认后打 `v0.5.11` 标签执行正式发布。

@@ -256,9 +256,10 @@ export async function verifyDownloadedReleaseArtifacts({ build, version, sourceH
     const root = join(downloads, artifact)
     if (!lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) fail('artifact directory must not be a symlink')
     const files = build.files.filter(file => file.artifact === artifact)
-    exactSet(readdirSync(root), [...files.map(file => file.name), ...(!exactBuild ? [RECEIPT] : [])], `${artifact} files`)
+    const verifyReceipt = !exactBuild || (build.headRef === 'refs/heads/main' && existsSync(join(root, RECEIPT)))
+    exactSet(readdirSync(root), [...files.map(file => file.name), ...(verifyReceipt ? [RECEIPT] : [])], `${artifact} files`)
     let receipt
-    if (!exactBuild) {
+    if (verifyReceipt) {
       plainFile(join(root, RECEIPT))
       receipt = JSON.parse(readFileSync(join(root, RECEIPT), 'utf8'))
       for (const key of ['repository', 'workflowPath', 'sourceHead', 'runId', 'runAttempt']) equal(receipt[key], build[key], `build receipt ${key}`)

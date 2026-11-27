@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "version": "0.5.11",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "platform": "darwin",
+  "arch": "arm64",
+  "installerSha256": "976e39d36aff9f0c0b5916268549e1a98f3666657f0478363cd6414ce2d74cfa",
+  "installedAsarSha256": "3a69201b26267535010626b9f27de93eb1500adea3b758fddaa07a5fccc1a121",
+  "buildRunId": 46003137436,
+  "buildRunAttempt": 1,
+  "journeys": [
+    {
+      "id": "startup-branding",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "mac-startup-appearance.json records the actual cold startup appearance and transition to the installed workbench.",
+      "proofFile": "mac-startup-appearance.json",
+      "proofSha256": "8334d3e4106960830027b6f28703b1ba21c09057ffdf7a80de669f3b68f23469"
+    },
+    {
+      "id": "offline-spreadsheet",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "darwin/arm64 ran the offline workbook workflow in the exact installed package and recorded the workbook and read-only XLSX assertions.",
+      "proofFile": "mac-offline-spreadsheet.json",
+      "proofSha256": "766bdd9d7ce3341495771d065e169028cd9b0c8c2cf9a93ad15dbac408b629cf"
+    },
+    {
+      "id": "website-pptx",
+      "method": "live-model-ui",
+      "status": "passed",
+      "evidence": "mac-ppt-journey-live.json shows the real model completing the original installed GUI conversation from the public website and opening the editable PPTX.",
+      "proofFile": "mac-ppt-journey-live.json",
+      "proofSha256": "c25fc952ff073af948e558a20725b9d65927533ec4cbcf5bac88ac2be47ebda7"
+    }
+  ],
+  "execution": "hosted",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/windows-install-smoke.yml",
+    "sourceHead": "76e47704eb3d3711d660d9b2f406b7e4b3851200",
+    "runId": 46048665992,
+    "runAttempt": 1
+  }
+}

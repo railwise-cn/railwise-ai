@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "status": "passed",
+  "version": "0.5.11",
+  "sourceHead": "a435bb924176f062244724aa0120b49e84ab6d98",
+  "platform": "darwin",
+  "arch": "x64",
+  "installerSha256": "b5d6171856c5cc103811283ffa6332695751f63fc98ad1bf998a1586555ec5b4",
+  "installedAsarSha256": "5cc664a77cdbdfcb63c65b5f6a8d45030c36411ccdeb5027db2a611f112d9230",
+  "buildRunId": 46003137436,
+  "buildRunAttempt": 1,
+  "journeys": [
+    {
+      "id": "startup-branding",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "mac-startup-appearance.json records the actual cold startup appearance and transition to the installed workbench.",
+      "proofFile": "mac-startup-appearance.json",
+      "proofSha256": "ac48e7b346849af0369e3468df78e4b18e3da57eb9d7c29bc10a09bf66c82a45"
+    },
+    {
+      "id": "offline-spreadsheet",
+      "method": "installed-ui",
+      "status": "passed",
+      "evidence": "darwin/x64 ran the offline workbook workflow in the exact installed package and recorded the workbook and read-only XLSX assertions.",
+      "proofFile": "mac-offline-spreadsheet.json",
+      "proofSha256": "a694409d755af3a18901c9d8d3a467aa969fe8d20a2c9f225516485eec342c51"
+    }
+  ],
+  "execution": "hosted",
+  "provenance": {
+    "repository": "railwise-cn/railwise-ai",
+    "workflowPath": ".github/workflows/windows-install-smoke.yml",
+    "sourceHead": "76e47704eb3d3711d660d9b2f406b7e4b3851200",
+    "runId": 46048665992,
+    "runAttempt": 1
+  }
+}
