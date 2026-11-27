@@ -183,7 +183,8 @@ async function waitForNativeMacDocument(cdp, filename, artifactPath) {
     const documentWindow = system.windows.find(window => window.title.includes(filename) || window.title.includes(baseName))
     if (documentWindow) return { status: 'os-open-accepted', application: documentWindow.processName, windowTitle: documentWindow.title,
       defaultHandler, observation: lastObservation }
-    if (processes.length > 0 && lockOpened && !renderer.visibleFailure) {
+    const handlerForegrounded = /LibreOffice|soffice/i.test(system.frontmostProcess) && renderer?.artifactVisible === true
+    if (processes.length > 0 && (lockOpened || handlerForegrounded) && !renderer?.visibleFailure) {
       return { status: 'os-open-accepted', application: 'LibreOffice', windowTitle: filename,
         defaultHandler, observation: lastObservation }
     }
