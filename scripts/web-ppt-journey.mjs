@@ -11,6 +11,7 @@ export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
 export const webPptMonitoringTopic = /自动化监测|工程监测|变形监测|安全监测/
 export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和自动化监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
+export const liveWebPptJourneyPrompt = `${webPptJourneyPrompt}请直接使用内置文件工具（write）以及 ppt_master_quality_check、ppt_master_export 工具在工作区制作并导出，不要调用 request_host_shell 执行任何本机命令。`
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
@@ -261,7 +262,7 @@ export function canResolvePptJourneyApproval({ live, allowControlledHostShell, t
   return live === true || allowControlledHostShell === true && ['web_fetch', 'request_host_shell'].includes(toolName)
 }
 
-export function inspectLiveWebPptApprovalResolution(inputs, attention) {
+export function inspectLiveWebPptApprovalResolution(inputs, attention, expectedDecision = 'allow') {
   assert.ok(Array.isArray(inputs), 'The actual task inputs API must return an array')
   const rows = inputs.filter(input => input.kind === 'approval_resolution' && input.sourceId === attention.requestId)
   assert.ok(rows.length <= 1, 'The reviewed approval must have at most one durable decision')
@@ -271,20 +272,47 @@ export function inspectLiveWebPptApprovalResolution(inputs, attention) {
   // resolution property. Bind the read-back to the exact request the UI showed.
   const saved = JSON.parse(rows[0].text)
   assert.equal(saved.request, attention.payload.approval.summary)
-  assert.equal(saved.resolution?.decision, 'allow')
-  return { status: 'allowed', inputId: rows[0].id }
+  assert.equal(saved.resolution?.decision, expectedDecision)
+  return { status: expectedDecision === 'allow' ? 'allowed' : 'denied', inputId: rows[0].id }
 }
 
-async function resolveLiveWebPptApproval(cdp, taskId, { workspace, skillGuardPath, onStage, reviewedScopes }) {
+async function resolveLiveWebPptApproval(cdp, taskId, { live, workspace, skillGuardPath, onStage, reviewedScopes }) {
   await onStage?.('review-pending-task-approval')
   const pending = await cdp.evaluate(`${readRuntime('/v1/inbox')}.then(items=>items.filter(item=>item.taskId===${literal(taskId)} && item.kind==='approval' && item.status==='pending'))`)
   assert.equal(pending.length, 1, 'Only one exact approval may be pending for the isolated website-to-PPT task')
-  const receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  const button = 'section[aria-label="任务"] button'
+  let receipt
+  try {
+    receipt = inspectLiveWebPptApproval(pending[0], { taskId, workspace, skillGuardPath })
+  } catch (error) {
+    if (!live) throw error
+    await onStage?.('deny-unapproved-live-host-action')
+    await cdp.wait(`(() => {const buttons=[...document.querySelectorAll(${literal(button)})].filter(node=>
+      node.getClientRects().length && !node.disabled && node.textContent.trim()==='拒绝');return buttons.length===1;})()`,
+      'the single visible deny control for the unapproved live action', 30_000)
+    await cdp.click(button, '拒绝')
+    const denyDeadline = Date.now() + 30_000
+    while (Date.now() < denyDeadline) {
+      const inputs = await cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`))
+      const resolution = inspectLiveWebPptApprovalResolution(inputs, pending[0], 'deny')
+      if (resolution) {
+        return {
+          id: pending[0].requestId,
+          tool: pending[0].payload?.approval?.toolName ?? 'unknown',
+          scope: 'denied-unapproved-live-action',
+          decision: 'deny',
+          method: 'installed-task-card',
+          inputId: resolution.inputId
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+    throw new Error('The denied live approval did not produce one durable decision')
+  }
   assert.ok(!reviewedScopes.has(receipt.scope), 'The same bounded action must not require repeated approval')
   reviewedScopes.add(receipt.scope)
   const stage = receipt.tool === 'web_fetch' ? 'approve-read-only-official-site' : 'approve-packaged-attribution-check'
   await onStage?.(stage)
-  const button = 'section[aria-label="任务"] button'
   await cdp.wait(`(() => {const buttons=[...document.querySelectorAll(${literal(button)})].filter(node=>
     node.getClientRects().length && !node.disabled && node.textContent.trim()==='允许此操作');return buttons.length===1;})()`,
     'the single visible approval control for the isolated task', 30_000)
@@ -800,7 +828,9 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
     },
     async verify(cdp, { openArtifact, browserInstanceId, onStage, pauseAndRestart } = {}) {
       await onStage?.('start-original-conversation-journey')
-      let journey = await submitWebPptJourney(cdp, { expectedQuestion: live ? '网址' : webPptQuestion,
+      let journey = await submitWebPptJourney(cdp, {
+        promptText: live ? liveWebPptJourneyPrompt : webPptJourneyPrompt,
+        expectedQuestion: live ? '网址' : webPptQuestion,
         sourceAnswer: fallback?.url ?? webPptSourceHost, requireNewTurn: Boolean(fallback),
         stopAtQuestion: Boolean(pauseAndRestart), onStage })
       let restartRecovery
