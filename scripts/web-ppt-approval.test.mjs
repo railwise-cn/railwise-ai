@@ -100,6 +100,12 @@ test('PPT failure diagnostics retain error codes while excluding error messages 
 })
 
 test('PPT failure diagnostics retain only safe relative Skill and export inputs', () => {
+  assert.deepEqual(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'web_fetch', arguments: {
+    url: 'https://www.railwise.cn/about?token=private'
+  } }), { origin: 'https://www.railwise.cn' })
+  assert.equal(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'web_fetch', arguments: {
+    url: 'file:///private/secret'
+  } }), undefined)
   assert.deepEqual(safeWebPptToolDetails({ kind: 'tool_call', toolName: 'read_skill_resource', arguments: {
     skill_id: 'ppt-master', path: 'workflows/generate-pptx.md', offset_bytes: 0
   } }), { skillId: 'ppt-master', resourcePath: 'workflows/generate-pptx.md' })

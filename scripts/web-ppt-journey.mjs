@@ -121,6 +121,12 @@ export function safeWebPptToolDetails(item) {
     ? value
     : undefined
   const details = {}
+  if (item.toolName === 'web_fetch') {
+    try {
+      const origin = new URL(args?.url).origin
+      if (['http:', 'https:'].includes(new URL(origin).protocol)) details.origin = origin
+    } catch { /* omit malformed or absent URL */ }
+  }
   if (item.toolName === 'read_skill_resource') {
     if (typeof args?.skill_id === 'string' && /^[a-z0-9][a-z0-9_-]{0,127}$/i.test(args.skill_id)) {
       details.skillId = args.skill_id
@@ -141,21 +147,47 @@ export function safeWebPptToolDetails(item) {
 }
 
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
-  const [task, inputs, inbox, thread, runtimeDiagnostics] = await Promise.all([
+  const [task, inputs, inbox, thread, runtimeDiagnostics, taskPage, ui] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
     cdp.evaluate(readRuntime('/v1/inbox')),
     cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`)),
-    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/diagnostics`))
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/diagnostics`)),
+    cdp.evaluate(`window.workwise.listTaskPage({filter:'all',limit:200})`),
+    cdp.evaluate(`(() => {
+      const timeline = document.querySelector('.ds-chat-timeline');
+      const composer = document.querySelector('.ds-chat-composer-dock textarea');
+      return {
+        taskSectionLabels: [...(timeline?.querySelectorAll('section[aria-label]') ?? [])].map(section => section.getAttribute('aria-label')),
+        taskQuestionVisible: (timeline?.innerText ?? '').includes('网址'),
+        answerComposerVisible: Boolean(composer?.getClientRects().length),
+        taskQuestionBound: Boolean(document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'))
+      };
+    })()`)
   ])
   return {
     task: { id: task.id, status: task.status, originThreadId: task.originThreadId, threadId: task.threadId,
       activeTurnId: task.activeTurnId, waitingReason: task.waitingReason, stalledReason: task.stalledReason,
-      blockCode: task.blockCode, revision: task.revision },
+      blockCode: task.blockCode, revision: task.revision,
+      approvedWebReadOrigins: (task.authority?.approvedWebReadOrigins ?? []).map(item => item.origin) },
+    taskPage: {
+      items: taskPage.items.filter(candidate => candidate.id === taskId).map(candidate => ({
+        id: candidate.id, status: candidate.status, originThreadId: candidate.originThreadId,
+        threadId: candidate.threadId, visibility: candidate.visibility, visible: candidate.visible
+      })),
+      relatedTasks: taskPage.relatedTasks.filter(candidate => candidate.id === taskId).map(candidate => ({
+        id: candidate.id, status: candidate.status, originThreadId: candidate.originThreadId,
+        threadId: candidate.threadId, visibility: candidate.visibility, visible: candidate.visible
+      }))
+    },
+    ui,
     inputs: inputs.map(input => ({ id: input.id, kind: input.kind, status: input.status, sourceId: input.sourceId,
       textLength: typeof input.text === 'string' ? input.text.length : undefined })),
     attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
-      requestId: item.requestId, payloadKind: item.payload?.kind, provider: item.payload?.capability?.provider,
+      requestId: item.requestId, payloadKind: item.payload?.kind,
+      toolName: item.payload?.approval?.toolName,
+      origin: typeof item.payload?.approval?.networkReadOrigin === 'string' ? item.payload.approval.networkReadOrigin : undefined,
+      provider: item.payload?.capability?.provider,
       errorCode: item.payload?.capability?.errorCode, resolutionRoute: item.payload?.capability?.resolution?.route ?? item.payload?.capability?.action?.route })),
     runtime: {
       summary: safeWebPptRuntimeSummary(runtimeDiagnostics.summary),
@@ -167,8 +199,17 @@ async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
         taskPermissionId: turn.executionGrant.taskPermissionId, webTools: turn.executionGrant.allowedToolNames?.filter(name => ['web_fetch', 'web_search'].includes(name)) } } : {}),
       itemKinds: turn.items.map(item => ({ kind: item.kind, toolName: item.toolName, requestId: item.requestId,
         status: item.status, isError: item.isError, errorCode: safeWebPptErrorCode(item),
-        ...((item.kind === 'tool_call' ? safeWebPptToolDetails(item) : undefined) ?? {}) })) }))
+        ...((item.kind === 'tool_call' ? safeWebPptToolDetails(item) : item.kind === 'tool_result' ? safeWebPptToolResultDetails(item) : undefined) ?? {}) })) }))
   }
+}
+
+function safeWebPptToolResultDetails(item) {
+  if (item.toolName !== 'web_fetch' || !item.output || typeof item.output !== 'object') return undefined
+  const url = item.output.finalUrl ?? item.output.telemetry?.url
+  let origin
+  try { origin = new URL(url).origin } catch { /* invalid or absent URL */ }
+  return { ...(origin ? { origin } : {}), ...(typeof item.output.resultHash === 'string' && /^[a-f0-9]{64}$/.test(item.output.resultHash)
+    ? { resultHash: item.output.resultHash } : {}) }
 }
 
 export function inspectLiveWebPptSourceRead(completedTurn, expectedUrl, browserInstanceId) {
@@ -326,10 +367,21 @@ async function waitForWebPptTask(cdp, taskId, options) {
 }
 
 async function readWebPptAdmissionDiagnostics(cdp, priorThreadIds) {
-  const [threadList, tasks, inbox] = await Promise.all([
+  const [threadList, tasks, inbox, taskPage, ui] = await Promise.all([
     cdp.evaluate(readRuntime('/v1/threads')),
     cdp.evaluate(readRuntime('/v1/tasks?limit=100')),
-    cdp.evaluate(readRuntime('/v1/inbox'))
+    cdp.evaluate(readRuntime('/v1/inbox')),
+    cdp.evaluate(`window.workwise.listTaskPage({filter:'all',limit:200})`),
+    cdp.evaluate(`(() => {
+      const timeline = document.querySelector('.ds-chat-timeline');
+      const composer = document.querySelector('.ds-chat-composer-dock textarea');
+      return {
+        taskSectionLabels: [...(timeline?.querySelectorAll('section[aria-label]') ?? [])].map(section => section.getAttribute('aria-label')),
+        taskQuestionVisible: (timeline?.innerText ?? '').includes('网址'),
+        answerComposerVisible: Boolean(composer?.getClientRects().length),
+        taskQuestionBound: Boolean(document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'))
+      };
+    })()`)
   ])
   const newThreads = threadList.threads.filter(thread => !priorThreadIds.includes(thread.id))
   const threads = await Promise.all(newThreads.map(thread => cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(thread.id)}`))))
@@ -350,11 +402,22 @@ async function readWebPptAdmissionDiagnostics(cdp, priorThreadIds) {
         taskPermissionId: turn.executionGrant.taskPermissionId, webTools: turn.executionGrant.allowedToolNames?.filter(name => ['web_fetch', 'web_search'].includes(name)) } } : {}),
       items: turn.items.map(item => ({ kind: item.kind,
         toolName: item.toolName, status: item.status, isError: item.isError })) })) })),
+    taskPage: {
+      items: taskPage.items.filter(task => taskIds.has(task.id)).map(task => ({ id: task.id, status: task.status,
+        originThreadId: task.originThreadId, threadId: task.threadId, visibility: task.visibility, visible: task.visible })),
+      relatedTasks: taskPage.relatedTasks.filter(task => taskIds.has(task.id)).map(task => ({ id: task.id, status: task.status,
+        originThreadId: task.originThreadId, threadId: task.threadId, visibility: task.visibility, visible: task.visible }))
+    },
+    ui,
     tasks: tasks.filter(task => taskIds.has(task.id)).map(task => ({ id: task.id, status: task.status,
       activeTurnId: task.activeTurnId, threadId: task.threadId, waitingReason: task.waitingReason,
-      stalledReason: task.stalledReason, blockCode: task.blockCode, revision: task.revision })),
+      stalledReason: task.stalledReason, blockCode: task.blockCode, revision: task.revision,
+      visibility: task.visibility, visible: task.visible,
+      approvedWebReadOrigins: (task.authority?.approvedWebReadOrigins ?? []).map(item => item.origin) })),
     attention: inbox.filter(item => taskIds.has(item.taskId)).map(item => ({ kind: item.kind, status: item.status,
       requestId: item.requestId, errorCode: item.payload?.capability?.errorCode,
+      toolName: item.payload?.approval?.toolName,
+      origin: typeof item.payload?.approval?.networkReadOrigin === 'string' ? item.payload.approval.networkReadOrigin : undefined,
       resolutionRoute: item.payload?.capability?.resolution?.route ?? item.payload?.capability?.action?.route }))
   }
 }
@@ -850,10 +913,20 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`))
       const initialTurn = saved.turns.find(item => item.id === journey.turnId)
       const completedTurn = saved.turns.find(item => item.id === task.activeTurnId)
-      assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
-      assert.ok(completedTurn, 'The original conversation must retain the completed Turn')
-      assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
-        [{ id: 'ppt-master', name: 'PPT Master' }])
+      try {
+        assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
+        assert.ok(completedTurn, 'The original conversation must retain the completed Turn')
+        assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
+          [{ id: 'ppt-master', name: 'PPT Master' }])
+      } catch (error) {
+        error.webPptDiagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
+        error.webPptDiagnostics.savedTurn = {
+          initialTurnFound: Boolean(initialTurn), initialSkillIds: initialTurn?.activeSkillIds ?? [],
+          initialStatus: initialTurn?.status, completedTurnFound: Boolean(completedTurn),
+          completedTurnIdMatchesTask: completedTurn?.id === task.activeTurnId
+        }
+        throw error
+      }
       const sameTurn = initialTurn.id === completedTurn.id
       if (sameTurn) assert.equal(initialTurn.items.filter(item => item.kind === 'tool_result' && item.toolName === 'request_user_input').length, 1)
       else assert.equal(initialTurn.status, 'aborted')
