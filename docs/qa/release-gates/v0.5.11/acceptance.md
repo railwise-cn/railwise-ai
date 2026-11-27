@@ -315,3 +315,5 @@ Release run `45651308510` 的精确 Windows 安装检查及 macOS 原地升级 s
 本地验证：PPT 工具和 Skill 资源读取专项 12/12，PPT 安装验收驱动 13/13，KUN 与主仓类型检查、KUN 编译、改动文件 ESLint、Skill 归属检查、PPT Master attribution guard、差异空白检查通过。Apple Silicon sidecar 按当前源码构建后，`verify:ppt-master-sidecar` 通过，实际完成最终 SVG 质检、生成单页 PPTX 并重新导入 SVG。主应用生产构建在最终文案收窄前通过，sidecar 与 KUN 最终构建通过；最终源变更的主应用生产构建仍待复跑。
 
 本地源码和 sidecar 结果不代表候选安装包验收。当前真实模型网站到 PPT 的精确安装包旅程仍未通过，修复必须进入新候选后重跑 Mac 与 Windows；还需确认资源读取失败路径消失、最终质检工具实际调用、无需主机命令审批、PPTX 可编辑并在原对话打开。GitHub Actions 身份验证目前无效，尚未创建对应 PR、Quality CI 或新候选。正式 Stable 仍是 `0.5.10`，`0.5.11` 未发布。
+
+PR #136 的 Quality checks 已通过，源码提交为 `1004b75d72527d8708dffd89e88712f5ce8d1a1b`。隔离三端候选 Release run `45916446346` 首次在 Windows sidecar 往返验证阶段失败。Windows sidecar 实际返回 `exitCode=0`、`ppt-master.svg-quality-report.v1`、`stage=final` 和 `blockingCount=0`；失败仅因验收器把 Windows 的 `validation\\svg_quality_report.json` 按 POSIX 分隔符比较。现已将验收路径规范化为 `/`。该 run 未生成应用安装包，不能提供任何候选安装验收结果；路径修复后仍须重新跑候选构建及安装实测。

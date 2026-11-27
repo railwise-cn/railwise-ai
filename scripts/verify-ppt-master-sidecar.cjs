@@ -125,12 +125,13 @@ async function main() {
       projectPath: workspace,
       stage: 'final'
     })
-    if (quality.exitCode !== 0 || quality.reportPath !== 'validation/svg_quality_report.json' ||
+    const reportPath = String(quality.reportPath || '').replaceAll('\\', '/')
+    if (quality.exitCode !== 0 || reportPath !== 'validation/svg_quality_report.json' ||
         quality.report?.schema !== 'ppt-master.svg-quality-report.v1' || quality.report.stage !== 'final' ||
         quality.report.categories?.blocking?.count !== 0) {
       throw new Error(`PPT Master quality check failed: ${JSON.stringify({
         exitCode: quality.exitCode,
-        reportPath: quality.reportPath,
+        reportPath,
         schema: quality.report?.schema,
         stage: quality.report?.stage,
         blockingCount: quality.report?.categories?.blocking?.count
