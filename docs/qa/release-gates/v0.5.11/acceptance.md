@@ -317,3 +317,9 @@ Release run `45651308510` 的精确 Windows 安装检查及 macOS 原地升级 s
 本地源码和 sidecar 结果不代表候选安装包验收。真实模型网站到 PPT 的 Mac/Windows 精确包旅程仍未通过；新候选必须确认资源读取错误消失、最终质检工具实际调用、不会转为未授权主机命令审批、PPTX 可编辑并在原对话打开。首次候选验证和 Windows 路径断言失败详见本节末的 PR #136 与 Release run `45916446346` 记录。修正后的三端候选 run `45919711965` 正在构建，尚无安装包验收结果。正式 Stable 仍是 `0.5.10`，`0.5.11` 未发布。
 
 PR #136 的 Quality checks 已通过，当前提交为 `a98c70a190489f7f8d26d623663ac564b404f7e5`。隔离三端候选 Release run `45916446346` 首次在 Windows sidecar 往返验证阶段失败。Windows sidecar 实际返回 `exitCode=0`、`ppt-master.svg-quality-report.v1`、`stage=final` 和 `blockingCount=0`；失败仅因验收器把 Windows 的 `validation\\svg_quality_report.json` 按 POSIX 分隔符比较。现已将验收路径规范化为 `/`。该 run 未生成应用安装包，不能提供任何候选安装验收结果。修正后的三端候选 run `45919711965` 已启动，Mac 签名构建仍在进行，完成后再做精确包安装与真实模型验收。
+
+## 2026-11-27 网页读取审批复用与候选状态
+
+Mac 真实模型运行曾在同一任务内批准 `https://www.railwise.cn` 后继续读取来源，但再次读取时又请求相同审批。根因是 `AgentLoop` 按线程查询当前活动任务，而网页读取批准绑定到不可变 `executionGrant.taskId`。任务续接或状态变化后，线程的活动任务指针可能指向另一条任务，原批准因此不可见。修复在合入提交 `7859097071b68309b34a3583ea863e9828e059d1`：按授权中的精确任务 ID 读取批准记录，核对任务 ID、线程和撤权状态；原任务不存在时不复用其他活动任务的批准。新增两项回归测试覆盖活动任务切换和原任务缺失。KUN 全量测试 `5,528` 通过、`24` 跳过；精确专项 `35/35`；KUN 与主仓类型检查、KUN 构建、主仓生产构建、PPT 技能资源专项 `32/32`、release gate `591` 通过且 `1` 项因宿主没有 PowerShell 跳过。PR #136 的三项必需检查全部通过后合入。针对本次新增源代码的本地 ESLint 通过；仓库全量 ESLint 会扫到仓库既有生成文件错误，不作为改动文件 lint 结果。
+
+PPT Master 审计确认核心生成流程依赖已在候选源树中；另修正示例与维护文档中 9 个旧相对链接，完整本地相对链接扫描无断链。合入后的私有候选 Release run `45932277713` 已从 `main` 启动，输入为 `candidate_only=true`、`prepare_public_artifacts=true`、`skip_stability=true`、`publish_release=false`。它是私有候选，不代表 Stable 发布。该构建完成后需在同批精确安装包验证 Mac 与 Windows 真实模型网页到 PPTX、只读来源审批复用、PPTX 原生打开，以及 Windows 暂停/重启后在原对话继续。此前候选 `45919711965` 的安装包基于更早源码，不能替代这些验收。正式 Stable 仍为 `0.5.10`。
