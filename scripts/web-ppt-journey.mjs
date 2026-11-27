@@ -147,18 +147,40 @@ export function safeWebPptToolDetails(item) {
 }
 
 async function readWebPptTaskDiagnostics(cdp, taskId, executionThreadId) {
-  const [task, inputs, inbox, thread, runtimeDiagnostics] = await Promise.all([
+  const [task, inputs, inbox, thread, runtimeDiagnostics, taskPage, ui] = await Promise.all([
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}`)),
     cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/inputs`)),
     cdp.evaluate(readRuntime('/v1/inbox')),
     cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(executionThreadId)}`)),
-    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/diagnostics`))
+    cdp.evaluate(readRuntime(`/v1/tasks/${encodeURIComponent(taskId)}/diagnostics`)),
+    cdp.evaluate(`window.workwise.listTaskPage({filter:'all',limit:200})`),
+    cdp.evaluate(`(() => {
+      const timeline = document.querySelector('.ds-chat-timeline');
+      const composer = document.querySelector('.ds-chat-composer-dock textarea');
+      return {
+        taskSectionLabels: [...(timeline?.querySelectorAll('section[aria-label]') ?? [])].map(section => section.getAttribute('aria-label')),
+        taskQuestionVisible: (timeline?.innerText ?? '').includes('网址'),
+        answerComposerVisible: Boolean(composer?.getClientRects().length),
+        taskQuestionBound: Boolean(document.querySelector('.ds-chat-composer-dock')?.getAttribute('data-task-question-request-id'))
+      };
+    })()`)
   ])
   return {
     task: { id: task.id, status: task.status, originThreadId: task.originThreadId, threadId: task.threadId,
       activeTurnId: task.activeTurnId, waitingReason: task.waitingReason, stalledReason: task.stalledReason,
       blockCode: task.blockCode, revision: task.revision,
       approvedWebReadOrigins: (task.authority?.approvedWebReadOrigins ?? []).map(item => item.origin) },
+    taskPage: {
+      items: taskPage.items.filter(candidate => candidate.id === taskId).map(candidate => ({
+        id: candidate.id, status: candidate.status, originThreadId: candidate.originThreadId,
+        threadId: candidate.threadId, visibility: candidate.visibility, visible: candidate.visible
+      })),
+      relatedTasks: taskPage.relatedTasks.filter(candidate => candidate.id === taskId).map(candidate => ({
+        id: candidate.id, status: candidate.status, originThreadId: candidate.originThreadId,
+        threadId: candidate.threadId, visibility: candidate.visibility, visible: candidate.visible
+      }))
+    },
+    ui,
     inputs: inputs.map(input => ({ id: input.id, kind: input.kind, status: input.status, sourceId: input.sourceId,
       textLength: typeof input.text === 'string' ? input.text.length : undefined })),
     attention: inbox.filter(item => item.taskId === taskId).map(item => ({ kind: item.kind, status: item.status,
@@ -891,10 +913,20 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       const saved = await cdp.evaluate(readRuntime(`/v1/threads/${encodeURIComponent(journey.executionThreadId)}`))
       const initialTurn = saved.turns.find(item => item.id === journey.turnId)
       const completedTurn = saved.turns.find(item => item.id === task.activeTurnId)
-      assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
-      assert.ok(completedTurn, 'The original conversation must retain the completed Turn')
-      assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
-        [{ id: 'ppt-master', name: 'PPT Master' }])
+      try {
+        assert.ok(initialTurn?.activeSkillIds.includes('ppt-master'))
+        assert.ok(completedTurn, 'The original conversation must retain the completed Turn')
+        assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
+          [{ id: 'ppt-master', name: 'PPT Master' }])
+      } catch (error) {
+        error.webPptDiagnostics = await readWebPptTaskDiagnostics(cdp, journey.taskId, journey.executionThreadId)
+        error.webPptDiagnostics.savedTurn = {
+          initialTurnFound: Boolean(initialTurn), initialSkillIds: initialTurn?.activeSkillIds ?? [],
+          initialStatus: initialTurn?.status, completedTurnFound: Boolean(completedTurn),
+          completedTurnIdMatchesTask: completedTurn?.id === task.activeTurnId
+        }
+        throw error
+      }
       const sameTurn = initialTurn.id === completedTurn.id
       if (sameTurn) assert.equal(initialTurn.items.filter(item => item.kind === 'tool_result' && item.toolName === 'request_user_input').length, 1)
       else assert.equal(initialTurn.status, 'aborted')
