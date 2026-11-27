@@ -451,7 +451,7 @@ export function buildWindowsSmokeSettings({ workspace, dataDir, port, configured
     ...(configuredModel ? { provider: { providers: [{ id: providerId, name: liveModel ? '隔离验收模型' : '本机验收协议模型',
       apiKey, baseUrl, endpointFormat: 'chat_completions', models: [model] }] } } : {}),
     agents: { kun: { autoStart: true, port, dataDir,
-      ...(configuredModel ? { providerId, model, approvalPolicy: pauseRestartSmoke ? 'on-request' : 'auto',
+      ...(configuredModel ? { providerId, model, approvalPolicy: 'auto',
         sandboxMode: webPpt ? 'workspace-write' : 'read-only' } : {}) } }
   }
 }

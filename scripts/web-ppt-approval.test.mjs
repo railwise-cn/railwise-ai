@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
-import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, safeWebPptToolDetails, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
+import { canResolvePptJourneyApproval, inspectLiveWebPptApproval, inspectLiveWebPptApprovalResolution, inspectLiveWebPptSourceRead, safeWebPptErrorCode, safeWebPptRuntimeSpans, safeWebPptRuntimeSummary, safeWebPptToolDetails, validatePostRestartTurnFlow } from './web-ppt-journey.mjs'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 
@@ -134,4 +134,34 @@ test('PPT runtime diagnostics retain safe span fields and omit names, model and 
   assert.deepEqual(safeWebPptRuntimeSummary({ total: 4, running: 0, errors: 1, retries: 2, durationMs: 900,
     prompt: 'private response', model: 'private model' }), { total: 4, running: 0, errors: 1, retries: 2, durationMs: 900 })
   assert.equal(safeWebPptRuntimeSummary(undefined), undefined)
+})
+
+test('live source read verification accepts current official RailWise engineering survey and automated monitoring copy', () => {
+  const url = 'https://www.railwise.cn/'
+  const sha = hash('official-home')
+  const turn = {
+    items: [{
+      kind: 'tool_result',
+      isError: false,
+      toolName: 'web_fetch',
+      output: {
+        finalUrl: url,
+        text: '睿威科技 RailWise — 精密测量 · 自动化监测 · 工程软件，面向工程测量与变形监测场景。',
+        resultHash: sha,
+        byteCount: 128
+      }
+    }]
+  }
+  assert.deepEqual(inspectLiveWebPptSourceRead(turn, url), {
+    source: { url, sha256: sha, bytes: 128, tool: 'web_fetch' },
+    provider: 'fetch'
+  })
+  assert.throws(() => inspectLiveWebPptSourceRead({
+    items: [{
+      kind: 'tool_result',
+      isError: false,
+      toolName: 'web_fetch',
+      output: { finalUrl: url, text: '无关空白页面', resultHash: sha, byteCount: 18 }
+    }]
+  }, url))
 })

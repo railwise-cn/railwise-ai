@@ -243,7 +243,7 @@ export async function runInstalledMacPptJourney({ executable, temporary, evidenc
       appBehavior: { closeToTray: false, startMinimized: false, openAtLogin: false },
       provider: { providers: [{ id, name: 'RailWise QA', apiKey, baseUrl, endpointFormat: 'chat_completions', models: [model] }] },
       agents: { kun: { autoStart: true, port: await reserveLocalPort(), dataDir: join(root, 'runtime'), providerId: id, model,
-        approvalPolicy: mode === 'controlled' ? 'auto' : 'on-request', sandboxMode: 'workspace-write' } } }), { mode: 0o600 })
+        approvalPolicy: 'auto', sandboxMode: 'workspace-write' } } }), { mode: 0o600 })
     const port = await reserveLocalPort()
     child = spawn(executable, [`--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1',
       '--lang=zh-CN', '--force-dark-mode'], { cwd: root, env, stdio: 'ignore' })

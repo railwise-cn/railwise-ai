@@ -64,7 +64,7 @@ function futureFixture(changedPaths = []) {
 function hosted(record, t) {
   const { receipt } = record
   receipt.execution = 'hosted'
-  receipt.journeys = receipt.journeys.filter(journey => journey.id === 'conversation-task')
+  receipt.journeys = receipt.journeys.filter(journey => journey.id === 'startup-branding')
   const raw = Buffer.from('{"status":"passed"}\n')
   Object.assign(receipt.journeys[0], { proofFile: 'windows-install-smoke.json', proofSha256: reportSha256(raw) })
   receipt.provenance = { repository: RELEASE_REPOSITORY, workflowPath: RELEASE_WORKFLOW, sourceHead, runId: 1234, runAttempt: 1 }
@@ -101,58 +101,76 @@ function hosted(record, t) {
   return { run, artifact, job, api, responses, root }
 }
 
-test('new stable release versions require the structured matrix and legacy versions do not', () => {
+test('new stable release versions require the 3-tier matrix and legacy versions do not', () => {
   assert.equal(requiresCoreJourneys('0.5.10'), false)
   for (const target of ['0.5.11', '0.5.20', '0.6.0', '1.0.0']) assert.equal(requiresCoreJourneys(target), true)
-  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('windows-legacy-overlay'))
-  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('browserskill-fallback'))
-  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('offline-spreadsheet'))
-  assert.ok(requiredCoreJourneys(version).get('win32-x64').includes('pause-restart-recovery'))
-  assert.deepEqual(requiredCoreJourneys(version).get('darwin-arm64'), [
-    'website-pptx', 'startup-branding', 'offline-spreadsheet', 'ego-dadan-report'
+  assert.deepEqual(requiredCoreJourneys(version).get('win32-x64'), [
+    'startup-branding', 'windows-updater-sidebar', 'windows-updater-settings',
+    'website-pptx', 'pause-restart-recovery'
   ])
-  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('browserskill-fallback'))
+  assert.deepEqual(requiredCoreJourneys(version).get('darwin-arm64'), [
+    'startup-branding', 'offline-spreadsheet', 'website-pptx'
+  ])
+  assert.deepEqual(requiredCoreJourneys(version).get('darwin-x64'), [
+    'startup-branding', 'offline-spreadsheet'
+  ])
+  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('ego-dadan-report'))
+  assert.ok(!requiredCoreJourneys(version).get('win32-x64').includes('mainland-windows-install'))
   assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('kun-ag-ui-recovery'))
-  assert.ok(!requiredCoreJourneys(version).get('darwin-arm64').includes('public-procurement-html'))
-  assert.ok(!requiredCoreJourneys(version).get('win32-x64').includes('kun-ag-ui-recovery'))
   assert.ok(!requiredCoreJourneys(version).get('win32-x64').includes('public-procurement-html'))
-  assert.ok(!requiredCoreJourneys('0.5.12').get('win32-x64').includes('windows-updater-sidebar'))
-  assert.ok(!requiredCoreJourneys('0.5.12').get('win32-x64').includes('pause-restart-recovery'))
-  assert.ok(requiredCoreJourneys('0.5.12', { updater: true }).get('win32-x64').includes('windows-updater-sidebar'))
+  // Tier 1 updater + cold startup baseline remains mandatory on 0.5.12+ even without code-path heuristics
+  assert.deepEqual(requiredCoreJourneys('0.5.12').get('win32-x64'), [
+    'startup-branding', 'windows-updater-sidebar', 'windows-updater-settings'
+  ])
+  assert.deepEqual(requiredCoreJourneys('0.5.12').get('darwin-arm64'), [
+    'startup-branding', 'offline-spreadsheet'
+  ])
   assert.deepEqual(validateCoreJourneyReceipts(fixture(), options), [])
 })
 
-test('later releases require field journeys only for related production changes', () => {
+test('later releases add Tier 2 feature journeys dynamically from production changes and keep field journeys optional', () => {
   const unrelatedChanges = [
-    'README.md', 'kun/src/services/agent-loop.test.ts', 'scripts/verify-core-journeys.test.mjs',
+    'README.md', 'kun/src/loop/agent-loop.test.ts', 'scripts/verify-core-journeys.test.mjs',
     'src/shared/marketplace.test.ts',
     'docs/qa/release-gates/acceptance.md'
   ]
   const unrelated = futureFixture(unrelatedChanges)
-  assert.ok(!requiredCoreJourneys('0.5.12', { changedPaths: unrelatedChanges }).get('darwin-arm64').includes('ego-dadan-report'))
-  assert.ok(!requiredCoreJourneys('0.5.12', { changedPaths: unrelatedChanges }).get('win32-x64').includes('mainland-windows-install'))
+  assert.deepEqual(requiredCoreJourneys('0.5.12', { changedPaths: unrelatedChanges }).get('win32-x64'), [
+    'startup-branding', 'windows-updater-sidebar', 'windows-updater-settings'
+  ])
   assert.deepEqual(validateCoreJourneyReceipts(unrelated.records, unrelated.options), [])
 
-  const browserChanges = ['kun/src/services/ego-browser-runtime.ts']
-  const browser = futureFixture()
-  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: browserChanges }).get('darwin-arm64').includes('ego-dadan-report'))
-  assert.throws(() => validateCoreJourneyReceipts(browser.records, { ...browser.options, changedPaths: browserChanges }), /missing required journeys.*ego-dadan-report/)
+  const webPptChanges = ['kun/src/adapters/tool/web-tool-provider.ts']
+  const base = futureFixture()
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: webPptChanges }).get('darwin-arm64').includes('website-pptx'))
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: webPptChanges }).get('win32-x64').includes('website-pptx'))
+  assert.throws(() => validateCoreJourneyReceipts(base.records, { ...base.options, changedPaths: webPptChanges }), /missing required journeys.*website-pptx/)
+
+  const spreadsheetChanges = ['src/renderer/src/components/sheets/WorkspaceSheetView.tsx']
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: spreadsheetChanges }).get('win32-x64').includes('offline-spreadsheet'))
+
+  const pdfChanges = ['src/main/services/pdf-document-service.ts']
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: pdfChanges }).get('win32-x64').includes('pdf-attachments'))
 
   const marketplaceChanges = ['src/main/services/marketplace-mirror.ts']
-  const marketplace = futureFixture()
-  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: marketplaceChanges }).get('win32-x64').includes('mainland-windows-install'))
-  assert.throws(() => validateCoreJourneyReceipts(marketplace.records, { ...marketplace.options, changedPaths: marketplaceChanges }), /missing required journeys.*mainland-windows-install/)
+  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: marketplaceChanges }).get('win32-x64').includes('marketplace-mirror'))
+  assert.ok(!requiredCoreJourneys('0.5.12', { changedPaths: marketplaceChanges }).get('win32-x64').includes('mainland-windows-install'))
 
-  const lockChange = ['src/shared/marketplace-mirror-lock.json']
-  assert.ok(requiredCoreJourneys('0.5.12', { changedPaths: lockChange }).get('win32-x64').includes('mainland-windows-install'))
+  // Optional Tier 3 field receipts are still accepted and verified if supplied
+  const withOptionalField = futureFixture()
+  withOptionalField.records[0].receipt.journeys.push({
+    id: 'mainland-windows-install', status: 'passed', method: 'mainland-windows-ui',
+    evidence: 'Optional field observation', proofSha256: 'b'.repeat(64)
+  })
+  assert.deepEqual(validateCoreJourneyReceipts(withOptionalField.records, withOptionalField.options), [])
 })
 
 test('core receipts reject stale, incomplete, failed and simulated results', async t => {
   const mutations = [
-    ['missing Windows offline spreadsheet', reports => {
+    ['missing Windows updater sidebar', reports => {
       const windows = reports.find(record => record.receipt.platform === 'win32')
-      windows.receipt.journeys = windows.receipt.journeys.filter(journey => journey.id !== 'offline-spreadsheet')
-    }, /missing required journeys.*offline-spreadsheet/],
+      windows.receipt.journeys = windows.receipt.journeys.filter(journey => journey.id !== 'windows-updater-sidebar')
+    }, /missing required journeys.*windows-updater-sidebar/],
     ['omitted platform', reports => reports.pop(), /missing required journeys.*darwin-x64/],
     ['old build', ([record]) => { record.receipt.buildRunId-- }, /build run ID/],
     ['old attempt', ([record]) => { record.receipt.buildRunAttempt++ }, /build run attempt/],
@@ -163,7 +181,12 @@ test('core receipts reject stale, incomplete, failed and simulated results', asy
     ['skipped journey', ([record]) => { record.receipt.journeys[0].status = 'skipped' }, /status mismatch/],
     ['failed journey', ([record]) => { record.receipt.journeys[0].status = 'failed' }, /status mismatch/],
     ['simulated model', ([record]) => { record.receipt.journeys.find(journey => journey.id === 'website-pptx').method = 'installed-ui' }, /website-pptx test method/],
-    ['simulated market', ([record]) => { record.receipt.journeys.find(journey => journey.id === 'mainland-windows-install').method = 'installed-ui' }, /mainland-windows-install test method/],
+    ['simulated optional market', ([record]) => {
+      record.receipt.journeys.push({ id: 'mainland-windows-install', status: 'passed', method: 'installed-ui', evidence: 'bad', proofSha256: 'a'.repeat(64) })
+    }, /mainland-windows-install test method/],
+    ['unknown journey id', ([record]) => {
+      record.receipt.journeys.push({ id: 'kun-ag-ui-recovery', status: 'passed', method: 'installed-ui', evidence: 'bad', proofSha256: 'a'.repeat(64) })
+    }, /unexpected journey/],
     ['missing raw proof', ([record]) => { delete record.receipt.journeys[0].proofSha256 }, /raw proof/],
     ['wrong installed ASAR', ([, record]) => { record.receipt.installedAsarSha256 = 'a'.repeat(64) }, /reviewed installed ASAR/],
   ]

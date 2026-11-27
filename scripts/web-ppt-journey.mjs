@@ -9,7 +9,8 @@ import { browserSmokeDependency } from './prepare-browser-skill-smoke.mjs'
 export const webPptSourceHost = 'www.railwise.cn'
 export const webPptSourceUrl = `https://${webPptSourceHost}/`
 export const webPptQuestion = '请提供制作 PPT 所需的官网网址。'
-export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和安全监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
+export const webPptMonitoringTopic = /自动化监测|工程监测|变形监测|安全监测/
+export const webPptJourneyPrompt = '请用所选技能制作单页可编辑演示文稿 deck/website.pptx。请先用自由文本提问工具问我官网网址，再用官网的工程测量和自动化监测资料制作，并在演示文稿内列出来源。网页读取失败时不要重复相同请求；如有已连接的浏览器技能则用它读取，否则说明具体原因并停止。'
 const project = 'deck'
 const filename = 'website.pptx'
 const artifactPath = `${project}/${filename}`
@@ -57,7 +58,7 @@ document.querySelector('main').append(title, body);
 
 function createSlide(title, sourceUrl, marker) {
   const escape = value => value.replace(/[&<>]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[char])
-  const rows = [title, marker ?? '官网公开资料', sourceUrl].map((text, index) =>
+  const rows = [title, marker ?? '工程测量与自动化监测公开资料', sourceUrl].map((text, index) =>
     `<text x="80" y="${170 + index * 105}" fill="#142335" font-family="Arial" font-size="36">${escape(text)}</text>`)
   // Keep the generated write argument longer than the persisted display summary limit.
   const details = Array.from({ length: 22 }, (_, index) =>
@@ -177,7 +178,7 @@ export function inspectLiveWebPptSourceRead(completedTurn, expectedUrl, browserI
   if (webFetch) {
     const receipt = webFetch.output
     assert.equal(typeof receipt.text, 'string')
-    assert.ok(receipt.text.includes('工程测量') && receipt.text.includes('安全监测'))
+    assert.ok(receipt.text.includes('工程测量') && webPptMonitoringTopic.test(receipt.text))
     assert.match(receipt.resultHash, /^[a-f0-9]{64}$/)
     assert.ok(receipt.byteCount > 0)
     return { source: { url: receipt.finalUrl, sha256: receipt.resultHash, bytes: receipt.byteCount, tool: 'web_fetch' }, provider: 'fetch' }
@@ -194,7 +195,7 @@ export function inspectLiveWebPptSourceRead(completedTurn, expectedUrl, browserI
     assert.equal(output.status, 'succeeded')
     assert.equal(output.readScope, 'document')
     assert.equal(typeof output.html, 'string')
-    assert.ok(output.html.includes('工程测量') && output.html.includes('安全监测'))
+    assert.ok(output.html.includes('工程测量') && webPptMonitoringTopic.test(output.html))
     const resultHash = digest(output.html)
     assert.equal(output.resultHash, resultHash)
     assert.equal(output.evidence?.verified, true)
@@ -544,7 +545,7 @@ export async function verifyEditableWebPpt(path, artifact, { source = webPptSour
   const slideXml = await archive.file('ppt/slides/slide1.xml')?.async('string')
   assert.match(slideXml ?? '', /<p:sp>.*?<a:t[^>]*>[^<]+<\/a:t>/s, 'The slide must contain editable native text')
   assert.match(slideXml, /工程测量/)
-  assert.match(slideXml, /安全监测/)
+  assert.match(slideXml, webPptMonitoringTopic)
   const links = await archive.file('ppt/slides/_rels/slide1.xml.rels')?.async('string')
   assert.ok(`${slideXml}\n${links ?? ''}`.includes(source), 'The editable presentation must cite the actual source')
   if (marker) assert.ok(slideXml.includes(marker), 'The editable slide must contain the rendered fixture marker')
@@ -752,7 +753,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       } else {
         assert.equal(direct.finalUrl, webPptSourceUrl)
         assert.match(direct.text, /工程测量/)
-        assert.match(direct.text, /安全监测/)
+        assert.match(direct.text, webPptMonitoringTopic)
         assert.match(direct.resultHash, /^[a-f0-9]{64}$/)
         source = { url: direct.finalUrl, title: direct.title, sha256: direct.resultHash, bytes: direct.byteCount, tool: 'web_fetch' }
       }
@@ -760,7 +761,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       if (pauseAndRestart) {
         const guard = output('ppt-master-attribution-guard', true)
         if (!guard) return call('request_host_shell', {
-          command: `py "${skillGuardPath}"`, timeout_seconds: 20, ttl_seconds: 120, idempotency_key: 'ppt-master-attribution-guard'
+          command: `${process.platform === 'win32' ? 'python' : 'python3'} "${skillGuardPath}"`, timeout_seconds: 20, ttl_seconds: 120, idempotency_key: 'ppt-master-attribution-guard'
         }, 'ppt-master-attribution-guard')
         assert.notEqual(guard.isError, true, 'The installed attribution check must succeed after its one approval')
         assert.notEqual(guard.code, 'outcome_unknown', 'The approved command result must be verified')
@@ -855,7 +856,7 @@ export function createWebPptJourney({ workspace, sidecar, parseToolOutput, live 
       assert.deepEqual(initialTurn.items.find(item => item.kind === 'user_message' && item.skillSelections?.length)?.skillSelections,
         [{ id: 'ppt-master', name: 'PPT Master' }])
       const sameTurn = initialTurn.id === completedTurn.id
-      if (sameTurn) assert.equal(initialTurn.items.filter(item => item.kind === 'tool_result' && item.toolName === 'request_user_input').length, 1)
+      if (sameTurn) assert.equal(initialTurn.items.filter(item => item.kind === 'tool_result' && ['request_user_input', 'user_input'].includes(item.toolName)).length, 1)
       else assert.equal(initialTurn.status, 'aborted')
       let source = observed.source
       let browserRecovery

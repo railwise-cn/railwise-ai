@@ -16,12 +16,19 @@ const WIN = 'win32-x64'
 const MAC = 'darwin-arm64'
 const INTEL = 'darwin-x64'
 
-const windowsDesktopJourneys = [
-  'conversation-task', 'approval-resume', 'website-pptx', 'browserskill-fallback',
-  'daily-schedule', 'composer-capabilities', 'pdf-attachments', 'offline-spreadsheet', 'responsive-layout',
-  'startup-branding'
+const windowsKnownJourneys = [
+  'startup-branding', 'windows-updater-sidebar', 'windows-updater-settings', 'windows-legacy-overlay',
+  'website-pptx', 'pause-restart-recovery', 'browserskill-fallback',
+  'conversation-task', 'approval-resume', 'daily-schedule', 'composer-capabilities', 'pdf-attachments',
+  'offline-spreadsheet', 'responsive-layout', 'marketplace-mirror', 'video-shotcraft', 'mainland-windows-install'
 ]
-const macDesktopJourneys = ['website-pptx', 'startup-branding', 'offline-spreadsheet']
+const macArm64KnownJourneys = ['startup-branding', 'offline-spreadsheet', 'website-pptx', 'ego-dadan-report']
+const macIntelKnownJourneys = ['startup-branding', 'offline-spreadsheet']
+const knownCoreJourneys = new Map([
+  [WIN, windowsKnownJourneys],
+  [MAC, macArm64KnownJourneys],
+  [INTEL, macIntelKnownJourneys]
+])
 const specializedMethods = {
   'website-pptx': 'live-model-ui',
   'browserskill-fallback': 'real-browser-ui',
@@ -30,20 +37,24 @@ const specializedMethods = {
 }
 const fieldJourneys = new Set(['ego-dadan-report', 'mainland-windows-install'])
 
-function requiredFieldJourneys(changedPaths) {
+function changeDrivenJourneys(changedPaths) {
   const productionPaths = changedPaths.filter(path =>
-    !/(?:^|\/)(?:__tests__|tests?|fixtures?)(?:\/|$)/i.test(path)
+    !/(?:^|\/)(?:__tests__|tests?|fixtures?|docs|release|openspec)(?:\/|$)/i.test(path)
     && !/\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path)
+    && !/^(?:README|CHANGELOG|AGENTS)\.md$/i.test(path)
   )
-  const affectsEgoBrowser = productionPaths.some(path =>
-    /^(?:kun\/src|src)\/.*(?:browser|ego)/i.test(path)
-    || /^(?:kun\/src\/(?:contracts\/capabilities|server\/runtime-factory|services\/task-controller)|src\/main\/managed-runtime-process)\.[cm]?[jt]sx?$/i.test(path)
-  )
-  const affectsMarketplace = productionPaths.some(path =>
-    /^src\/(?:main|renderer|shared|asset)\/.*(?:marketplace|plugin|skill)/i.test(path)
-    || /^scripts\/(?:build-marketplace-mirror|stage-managed-dependencies|verify-marketplace-mirror-lock)\.[cm]?[jt]s$/i.test(path)
-  )
-  return { egoBrowser: affectsEgoBrowser, marketplace: affectsMarketplace }
+  const matches = pattern => productionPaths.some(path => pattern.test(path))
+  return {
+    webPpt: matches(/^(?:kun\/src\/(?:loop\/|services\/(?:task-|web-)|adapters\/(?:persistent-human-gates|tool\/(?:web-|ppt-master|builtin-ppt)))|src\/asset\/skills\/ppt-master\/)/i),
+    taskRecovery: matches(/^(?:kun\/src\/(?:loop\/|services\/task-|adapters\/persistent-human-gates)|src\/renderer\/src\/components\/(?:Workbench|chat\/.*Task|tasks\/))/i),
+    browserSkill: matches(/^(?:kun\/src\/.*browser-skill|src\/main\/.*browser-skill|scripts\/stage-managed-dependencies)/i),
+    spreadsheet: matches(/^src\/(?:main|renderer|shared)\/.*(?:sheet|univer|xlsx|csv)/i),
+    composerAttachments: matches(/^(?:kun\/src\/adapters\/tool\/attachment-|src\/(?:main|renderer|shared)\/.*(?:attachment|pdf-document|ChatComposer))/i),
+    marketplaceMirror: matches(/^(?:src\/(?:main|renderer|shared|asset)\/.*(?:marketplace|plugin)|scripts\/(?:build-marketplace-mirror|verify-marketplace-mirror-lock))/i),
+    videoShotcraft: matches(/^(?:src|kun)\/.*video-shotcraft/i),
+    taskSchedule: matches(/^(?:kun\/src\/services\/.*schedule|src\/(?:main|renderer)\/.*schedule)/i),
+    responsiveLayout: matches(/^src\/renderer\/src\/components\/(?:layout\/|sidebar\/)/i)
+  }
 }
 
 function fail(message) { throw new Error(`[core-journeys] ${message}`) }
@@ -61,16 +72,31 @@ export function requiresCoreJourneys(version) {
 
 export function requiredCoreJourneys(version, { updater = false, changedPaths = [] } = {}) {
   const firstRelease = version === '0.5.11'
-  const fieldRequirements = requiredFieldJourneys(changedPaths)
+  const changes = firstRelease ? {} : changeDrivenJourneys(changedPaths)
+  void updater
   const windows = [
-    ...windowsDesktopJourneys, 'marketplace-mirror', 'video-shotcraft',
-    ...(firstRelease || fieldRequirements.marketplace ? ['mainland-windows-install'] : []),
-    ...(updater || firstRelease ? ['windows-updater-sidebar', 'windows-updater-settings'] : []),
-    ...(firstRelease ? ['windows-legacy-overlay', 'pause-restart-recovery'] : [])
+    // Tier 1: mandatory cold-startup and real in-app GUI upgrades on every release >= 0.5.11.
+    'startup-branding', 'windows-updater-sidebar', 'windows-updater-settings',
+    // Tier 2: change-driven core feature journeys (0.5.11 closes web/PPT/pause-restart).
+    ...(firstRelease || changes.webPpt ? ['website-pptx'] : []),
+    ...(firstRelease || changes.taskRecovery ? ['pause-restart-recovery'] : []),
+    ...(changes.browserSkill ? ['browserskill-fallback'] : []),
+    ...(changes.spreadsheet ? ['offline-spreadsheet'] : []),
+    ...(changes.composerAttachments ? ['composer-capabilities', 'pdf-attachments'] : []),
+    ...(changes.marketplaceMirror ? ['marketplace-mirror'] : []),
+    ...(changes.videoShotcraft ? ['approval-resume', 'video-shotcraft'] : []),
+    ...(changes.taskSchedule ? ['conversation-task', 'daily-schedule'] : []),
+    ...(changes.responsiveLayout ? ['responsive-layout'] : [])
+  ]
+  const macArm64 = [
+    // Tier 1: mandatory cold-startup and offline workbook smoke on macOS Apple Silicon.
+    'startup-branding', 'offline-spreadsheet',
+    // Tier 2: change-driven live website-to-PPT journey.
+    ...(firstRelease || changes.webPpt ? ['website-pptx'] : [])
   ]
   return new Map([
     [WIN, windows],
-    [MAC, [...macDesktopJourneys, ...(firstRelease || fieldRequirements.egoBrowser ? ['ego-dadan-report'] : [])]],
+    [MAC, macArm64],
     [INTEL, ['startup-branding', 'offline-spreadsheet']]
   ])
 }
@@ -135,7 +161,8 @@ export function validateCoreJourneyReceipts(records, { version, build, packageId
     equal(receipt.buildRunAttempt, build.runAttempt, 'installer build run attempt')
     const platform = `${receipt.platform}-${receipt.arch}`
     const expected = required.get(platform)
-    if (!expected) fail(`unsupported receipt platform: ${platform}`)
+    const known = knownCoreJourneys.get(platform)
+    if (!expected || !known) fail(`unsupported receipt platform: ${platform}`)
     const installer = installers.get(platform)
     if (!installer) fail(`missing reviewed installer for ${platform}`)
     equal(receipt.installerSha256, installer.sha256, `${platform} reviewed installer SHA-256`)
@@ -158,7 +185,7 @@ export function validateCoreJourneyReceipts(records, { version, build, packageId
     if (!Array.isArray(receipt.journeys) || !receipt.journeys.length) fail('receipt journeys are required')
     for (const journey of receipt.journeys) {
       const id = journey?.id
-      if (!expected.includes(id)) fail(`unexpected journey on ${platform}: ${id}`)
+      if (!known.includes(id)) fail(`unexpected journey on ${platform}: ${id}`)
       const key = `${platform}/${id}`
       if (seen.has(key)) fail(`duplicate required journey: ${key}`)
       equal(journey.status, 'passed', `${key} status`)
